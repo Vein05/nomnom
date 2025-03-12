@@ -32,7 +32,7 @@ func main() {
 	println("Dir:", query.Dir)
 
 	// Call the SendQuery function
-	aideepseek.SendQuery(config, *query)
+	aideepseek.SendQueryWithOpenRouter(config, *query)
 
 	cmd.Execute()
 }
