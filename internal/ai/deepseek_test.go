@@ -50,7 +50,7 @@ func TestSendQuery(t *testing.T) {
 	}
 
 	// Test the SendQuery function
-	SendQuery(config, testQuery)
+	SendQueryWithDeepSeek(config, testQuery)
 
 	// Verify that new names were assigned for all files
 	for i, file := range testQuery.Folders[0].FileList {
