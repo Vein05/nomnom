@@ -1,0 +1,32 @@
+# Iterative method using a for loop
+def fibonacci_iterative(n):
+    a, b = 0, 1
+    for _ in range(n):
+        print(a, end=" ")
+        a, b = b, a + b
+
+# Iterative method using a while loop
+def fibonacci_while(n):
+    a, b = 0, 1
+    while a < n:
+        print(a, end=" ")
+        a, b = b, a + b
+
+# Recursive method
+def fibonacci_recursive(n):
+    if n <= 1:
+        return n
+    else:
+        return fibonacci_recursive(n-1) + fibonacci_recursive(n-2)
+
+# Example usage:
+num_terms = 10
+print("Fibonacci sequence (iterative for loop):")
+fibonacci_iterative(num_terms)
+
+print("\nFibonacci sequence (iterative while loop):")
+fibonacci_while(50)
+
+print("\nFibonacci sequence (recursive):")
+for i in range(num_terms):
+    print(fibonacci_recursive(i), end=" ")
