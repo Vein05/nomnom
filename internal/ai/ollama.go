@@ -11,7 +11,7 @@ import (
 )
 
 // SendQueryWithOllama sends a query to the Ollama API to generate new file names
-func SendQueryWithOllama(config configutils.Config, query contentprocessors.Query) {
+func SendQueryWithOllama(config configutils.Config, query contentprocessors.Query) (result contentprocessors.Query, err error) {
 	// Set up the client with Ollama base URL
 	baseURL := "http://localhost:11434/api/"
 	client := deepseek.NewClient("", baseURL) // No API key needed for local Ollama
@@ -20,5 +20,8 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 
 	if err := SendQueryToLLM(client, query, QueryOpts{Model: config.AI.OllamaModel}); err != nil {
 		log.Fatalf("error: %v", err)
+		return contentprocessors.Query{}, err
 	}
+
+	return query, nil
 }
