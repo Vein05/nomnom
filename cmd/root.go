@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
-	"strconv"
+	"path/filepath"
+
+	aideepseek "nomnom/internal/ai"
+	contentprocessors "nomnom/internal/content"
+	configutils "nomnom/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -22,37 +27,74 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI tool to rename files using AI",
 	Long:  `NomNom is a command-line tool that renames files in a folder based on their content using AI models.`,
 	Run: func(cmd *cobra.Command, _ []string) {
-		a := cmd.Flags()
+		fmt.Println("\n[1/6] Loading configuration...")
+		// Load configuration
+		config := configutils.LoadConfig(cmdArgs.configPath)
 
-		dir, _ := a.GetString("dir")
-		configPath, _ := a.GetString("config")
-		autoApprove, _ := a.GetBool("auto-approve")
-		dryRun, _ := a.GetBool("dry-run")
-		verbose, _ := a.GetBool("verbose")
+		fmt.Println("[2/6] Creating new query...")
+		// Create a new query
+		query, err := contentprocessors.NewQuery(
+			"What is a descriptive name for this file based on its content? Respond with just the filename.",
+			cmdArgs.dir,
+			cmdArgs.configPath,
+			cmdArgs.autoApprove,
+			cmdArgs.dryRun,
+			cmdArgs.verbose,
+		)
+		if err != nil {
+			fmt.Printf("Error creating query: %v\n", err)
+			os.Exit(1)
+		}
 
-		_, err := os.Stdout.WriteString("NomNom is running...\n")
+		// Set up output directory
+		fmt.Println("[3/6] Setting up output directory...")
+		outputDir := config.Output
+		if outputDir == "" {
+			outputDir = filepath.Join(cmdArgs.dir, "renamed")
+		}
+
+		fmt.Println("[4/6] Processing files with AI to generate new names...")
+		// Process files with AI to get new names
+		aiResult, err := aideepseek.HandleAI(config, *query)
 		if err != nil {
+			fmt.Printf("Error processing with AI: %v\n", err)
 			os.Exit(1)
 		}
-		_, err = os.Stdout.WriteString("The source directory is: " + dir + "\n")
+		// Update query with AI results
+		query.Folders = aiResult.Folders
+
+		// Create and run the safe processor
+		fmt.Println("[5/6] Processing file renames...")
+		processor := contentprocessors.NewSafeProcessor(query, outputDir)
+		results, err := processor.Process()
 		if err != nil {
+			fmt.Printf("Error processing files: %v\n", err)
 			os.Exit(1)
 		}
-		_, err = os.Stdout.WriteString("The config path is: " + configPath + "\n")
-		if err != nil {
-			os.Exit(1)
+
+		// Print processing results
+		fmt.Println("\n[6/6] Generating summary...")
+		fmt.Println("\nProcessing Results:")
+		fmt.Println("===================")
+
+		successCount := 0
+		for _, result := range results {
+			if result.Success {
+				successCount++
+				if cmdArgs.dryRun {
+					fmt.Printf("Would rename: %s -> %s\n", filepath.Base(result.OriginalPath), filepath.Base(result.NewPath))
+				} else {
+					fmt.Printf("Renamed: %s -> %s\n", filepath.Base(result.OriginalPath), filepath.Base(result.NewPath))
+				}
+			} else {
+				fmt.Printf("Error processing %s: %v\n", filepath.Base(result.OriginalPath), result.Error)
+			}
 		}
-		_, err = os.Stdout.WriteString("Auto approve is: " + strconv.FormatBool(autoApprove) + "\n")
-		if err != nil {
-			os.Exit(1)
-		}
-		_, err = os.Stdout.WriteString("Dry run is: " + strconv.FormatBool(dryRun) + "\n")
-		if err != nil {
-			os.Exit(1)
-		}
-		_, err = os.Stdout.WriteString("Verbose is: " + strconv.FormatBool(verbose) + "\n")
-		if err != nil {
-			os.Exit(1)
+
+		fmt.Printf("\nSummary: Successfully processed %d/%d files\n", successCount, len(results))
+		if cmdArgs.dryRun {
+			fmt.Println("This was a dry run. No files were actually modified.")
+			fmt.Println("To perform actual changes, run with --dry-run=false")
 		}
 	},
 }
