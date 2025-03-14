@@ -12,7 +12,7 @@ import (
 )
 
 // SendQueryWithOpenRouter sends a query to the OpenRouter API to generate new file names
-func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.Query) {
+func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.Query) (result contentprocessors.Query, err error) {
 	// Set up the client with OpenRouter base URL
 	baseURL := "https://openrouter.ai/api/v1/"
 	client := deepseek.NewClient(os.Getenv("OPENROUTER_API_KEY"), baseURL)
@@ -26,5 +26,8 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 
 	if err := SendQueryToLLM(client, query, opts); err != nil {
 		log.Fatalf("error: %v", err)
+		return contentprocessors.Query{}, err
 	}
+
+	return query, nil
 }
