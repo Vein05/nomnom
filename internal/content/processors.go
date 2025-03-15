@@ -14,7 +14,6 @@ type Query struct {
 	ConfigPath  string
 	AutoApprove bool
 	DryRun      bool
-	Verbose     bool
 	Log         bool
 	Folders     []FolderType
 	Logger      *utils.Logger
@@ -35,7 +34,7 @@ type SafeProcessor struct {
 }
 
 // NewQuery creates a new Query object with the given parameters.
-func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dryRun bool, verbose bool, log bool) (*Query, error) {
+func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dryRun bool, log bool) (*Query, error) {
 	if prompt == "" {
 		prompt = "What is the title of this document? Only respond with the title."
 	}
@@ -55,7 +54,6 @@ func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dr
 		ConfigPath:  configPath,
 		AutoApprove: autoApprove,
 		DryRun:      dryRun,
-		Verbose:     verbose,
 		Log:         log,
 		Prompt:      prompt,
 		Folders:     folders.Folders,
