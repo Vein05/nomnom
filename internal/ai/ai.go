@@ -7,15 +7,18 @@ import (
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
 
+	utils "nomnom/internal/utils"
+
 	deepseek "github.com/cohesion-org/deepseek-go"
 )
 
 // QueryOpts contains options for the query
 type QueryOpts struct {
 	Model string
+	Case  string
 }
 
-const prompt string = `You are a desktop organizer that creates nice names for the files with their context. Only respond with the new name and the file extension. Do not change the file extension.`
+const prompt string = `You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension.`
 
 // HandleAI is a function that handles the AI model selection and query execution and returns the result.
 func HandleAI(config configutils.Config, query contentprocessors.Query) (contentprocessors.Query, error) {
@@ -89,8 +92,13 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			if err != nil {
 				return fmt.Errorf("error creating chat completion: %v", err)
 			}
+			// add a check to see if the response is empty
+			if response.Choices[0].Message.Content == "" {
+				return fmt.Errorf("empty response from AI")
+			}
 
-			file.NewName = response.Choices[0].Message.Content
+			// convert the response to the given case in the config
+			file.NewName = utils.ConvertCase(response.Choices[0].Message.Content, "snake", opts.Case)
 		}
 	}
 	return nil
