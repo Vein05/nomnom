@@ -13,6 +13,7 @@ type OperationType string
 
 const (
 	OperationRename OperationType = "rename"
+	OperationRevert OperationType = "revert"
 )
 
 // LogEntry represents a single operation in the log
@@ -74,8 +75,8 @@ func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 	return logger, nil
 }
 
-// LogOperation logs a single operation
-func (l *Logger) LogOperation(originalPath, newPath string, success bool, err error) {
+// LogOperationWithType logs a single operation with the specified operation type
+func (l *Logger) LogOperationWithType(originalPath, newPath string, opType OperationType, success bool, err error) {
 	if !l.enabled {
 		return
 	}
@@ -91,7 +92,7 @@ func (l *Logger) LogOperation(originalPath, newPath string, success bool, err er
 
 	entry := LogEntry{
 		Timestamp:    time.Now(),
-		Operation:    OperationRename,
+		Operation:    opType,
 		OriginalPath: originalPath,
 		NewPath:      newPath,
 		BaseDir:      baseDir,
@@ -104,6 +105,11 @@ func (l *Logger) LogOperation(originalPath, newPath string, success bool, err er
 	}
 
 	l.changeLog.Entries = append(l.changeLog.Entries, entry)
+}
+
+// LogOperation logs a single operation (defaults to rename operation for backward compatibility)
+func (l *Logger) LogOperation(originalPath, newPath string, success bool, err error) {
+	l.LogOperationWithType(originalPath, newPath, OperationRename, success, err)
 }
 
 // Close finalizes the log and writes it to disk
