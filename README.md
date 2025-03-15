@@ -16,7 +16,7 @@ A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intell
   - OpenRouter support (access to Claude, GPT-4, and more)
   - Local execution via Ollama
 - 👀 **Preview Mode**: Review generated names before applying changes
-- 🎯 **Flexible Naming**: Supports different casing options (snake_case, camelCase, etc.)
+- 🎯 **Flexible Naming**: Supports different casing options (snake_case, camelCase, kebab, pascal.)
 - 🔒 **Safe Operations**: Creates a separate directory for renamed files
 
 ## Installation
@@ -31,7 +31,7 @@ go install github.com/yourusername/nomnom@latest
 ```json
 {
   "output": "./renamed",
-  "case": "snake",
+  "case": "snake", // camel, kebab, pascal
   "ai": {
     "provider": "deepseek",
     "model": "deepseek-v3",
