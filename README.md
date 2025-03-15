@@ -18,6 +18,12 @@ A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intell
 - 👀 **Preview Mode**: Review generated names before applying changes
 - 🎯 **Flexible Naming**: Supports different casing options (snake_case, camelCase, kebab, pascal.)
 - 🔒 **Safe Operations**: Creates a separate directory for renamed files
+- 📝 **Operation Logging**: Detailed logs of all rename operations with:
+  - Full absolute paths for reliable tracking
+  - Original and new file locations
+  - Operation timestamps and status
+  - Support for reverting changes
+- ↩️ **Revert Support**: Ability to undo rename operations using logged history
 
 ## Installation
 
@@ -61,6 +67,7 @@ nomnom --dir <directory> [flags]
 | --auto-approve| -y    | Automatically approve changes                    |
 | --dry-run     | -n    | Preview changes without renaming                 |
 | --verbose     | -v    | Enable verbose logging                          |
+| --log         | -l    | Enable operation logging (default: true)        |
 
 ### Configuration
 
@@ -124,7 +131,44 @@ OpenRouter gives you access to various models including:
 - `openai/gpt-4-turbo-preview`
 - And many more! Check [OpenRouter's model list](https://openrouter.ai/docs#models) for all available options. I recommend using `google/gemini-2.0-flash-001`.
 
-## Contributing 🤝
+### Logging and Reverting
+
+NomNom includes a robust logging system that tracks all file operations:
+
+#### Logging Features
+- Logs are stored in `.nomnom/logs` in your target directory
+- Each session generates a unique log file (`changes_{timestamp}.json`)
+- Logs contain detailed information about each operation:
+  ```json
+  {
+    "session_id": "1234567890",
+    "start_time": "2024-03-21T10:00:00Z",
+    "end_time": "2024-03-21T10:01:00Z",
+    "entries": [
+      {
+        "timestamp": "2024-03-21T10:00:30Z",
+        "operation": "rename",
+        "original_path": "/absolute/path/to/original/file.txt",
+        "new_path": "/absolute/path/to/new/file.txt",
+        "base_dir": "/absolute/path/to/original",
+        "relative_path": "file.txt",
+        "success": true
+      }
+    ]
+  }
+  ```
+
+#### Revert Operations (Coming Soon)
+The revert functionality will allow you to:
+- List available operation logs
+- View details of specific rename sessions
+- Revert changes from a specific session
+- Perform dry-run reverts to preview changes
+- Selectively revert specific files
+
+Stay tuned for the revert command implementation!
+
+## Contributing ��
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
