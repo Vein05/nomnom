@@ -1,6 +1,6 @@
 {
   "output": "./renamed",
-  "case": "snake",
+  "case": "camel",
   "ai": {
     "provider": "openrouter",
     "model": "google/gemini-2.0-flash-001",
