@@ -29,8 +29,7 @@
     "retries": 3
   },
   "logging": {
-    "log_level": "info",
-    "log_file": "renamer.log",
-    "no_color": false
+    "enabled": true,
+    "log_path": "nomnom/logs"
   }
 }
