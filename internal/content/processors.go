@@ -2,6 +2,7 @@ package nomnom
 
 import (
 	"fmt"
+	utils "nomnom/internal/utils"
 	"os"
 	"path/filepath"
 )
@@ -14,7 +15,9 @@ type Query struct {
 	AutoApprove bool
 	DryRun      bool
 	Verbose     bool
+	Log         bool
 	Folders     []FolderType
+	Logger      *utils.Logger
 }
 
 // ProcessResult represents the result of processing files
@@ -32,7 +35,7 @@ type SafeProcessor struct {
 }
 
 // NewQuery creates a new Query object with the given parameters.
-func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dryRun bool, verbose bool) (*Query, error) {
+func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dryRun bool, verbose bool, log bool) (*Query, error) {
 	if prompt == "" {
 		prompt = "What is the title of this document? Only respond with the title."
 	}
@@ -42,14 +45,21 @@ func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dr
 		return nil, fmt.Errorf("error processing directory: %w", err)
 	}
 
+	logger, err := utils.NewLogger(log, dir)
+	if err != nil {
+		return nil, fmt.Errorf("error creating logger: %w", err)
+	}
+
 	return &Query{
 		Dir:         dir,
 		ConfigPath:  configPath,
 		AutoApprove: autoApprove,
 		DryRun:      dryRun,
 		Verbose:     verbose,
+		Log:         log,
 		Prompt:      prompt,
 		Folders:     folders.Folders,
+		Logger:      logger,
 	}, nil
 }
 
@@ -103,11 +113,34 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 						result.Error = fmt.Errorf("failed to rename file: %w", err)
 					}
 				}
+
+				// Log the operation if logging is enabled
+				if p.query.Logger != nil {
+					// Convert paths to absolute
+					absOrigPath, err := filepath.Abs(file.Path)
+					if err != nil {
+						fmt.Printf("Warning: Could not get absolute path for %s: %v\n", file.Path, err)
+						absOrigPath = file.Path
+					}
+					absNewPath, err := filepath.Abs(result.NewPath)
+					if err != nil {
+						fmt.Printf("Warning: Could not get absolute path for %s: %v\n", result.NewPath, err)
+						absNewPath = result.NewPath
+					}
+					p.query.Logger.LogOperation(absOrigPath, absNewPath, result.Success, result.Error)
+				}
 			} else {
 				result.NewPath = currentPath
 			}
 
 			results = append(results, result)
+		}
+	}
+
+	// Close the logger if it exists
+	if p.query.Logger != nil {
+		if err := p.query.Logger.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close logger: %v\n", err)
 		}
 	}
 
