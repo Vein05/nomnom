@@ -1,7 +1,6 @@
 package nomnom
 
 import (
-	"fmt"
 	"log"
 
 	contentprocessors "nomnom/internal/content"
@@ -16,7 +15,7 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 	baseURL := "http://localhost:11434/api/"
 	client := deepseek.NewClient("", baseURL) // No API key needed for local Ollama
 
-	fmt.Println("Using Ollama model:", config.AI.OllamaModel)
+	log.Printf("[INFO] Using Ollama model: %s", config.AI.OllamaModel)
 
 	opts := QueryOpts{
 		Model: config.AI.OllamaModel,
@@ -24,9 +23,10 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 	}
 
 	if err := SendQueryToLLM(client, query, opts); err != nil {
-		log.Fatalf("error: %v", err)
+		log.Printf("[ERROR] Failed to process query with Ollama: %v", err)
 		return contentprocessors.Query{}, err
 	}
 
+	log.Printf("[INFO] Successfully processed query with Ollama")
 	return query, nil
 }
