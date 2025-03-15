@@ -18,6 +18,7 @@ type args struct {
 	autoApprove bool
 	dryRun      bool
 	verbose     bool
+	log         bool
 }
 
 var cmdArgs = &args{}
@@ -40,6 +41,7 @@ var rootCmd = &cobra.Command{
 			cmdArgs.autoApprove,
 			cmdArgs.dryRun,
 			cmdArgs.verbose,
+			cmdArgs.log,
 		)
 		if err != nil {
 			fmt.Printf("Error creating query: %v\n", err)
@@ -111,6 +113,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&cmdArgs.autoApprove, "auto-approve", "y", false, "Automatically approve changes without user confirmation")
 	rootCmd.Flags().BoolVarP(&cmdArgs.dryRun, "dry-run", "n", true, "Preview changes without actually renaming files")
 	rootCmd.Flags().BoolVarP(&cmdArgs.verbose, "verbose", "v", false, "Enable verbose logging")
+	rootCmd.Flags().BoolVarP(&cmdArgs.log, "log", "l", true, "Enable logging to file")
 
 	rootCmd.MarkFlagRequired("dir")
 
