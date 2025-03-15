@@ -2,6 +2,7 @@ package nomnom
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -42,6 +43,7 @@ func formatFileSize(size int64) string {
 
 // ProcessDirectory processes a directory and returns a Query object
 func ProcessDirectory(dir string) (Query, error) {
+	log.Printf("[INFO] Processing directory: %s", dir)
 	var query Query
 
 	// create a new FolderType object
@@ -54,20 +56,26 @@ func ProcessDirectory(dir string) (Query, error) {
 	// read the directory
 	files, err := os.ReadDir(dir)
 	if err != nil {
+		log.Printf("[ERROR] Failed to read directory %s: %v", dir, err)
 		return Query{}, fmt.Errorf("error reading directory %s: %w", dir, err)
 	}
+
+	log.Printf("[INFO] Found %d files in directory", len(files))
 
 	// iterate over the files in the directory
 	for _, f := range files {
 		// if it's a file, process it
 		if !f.IsDir() {
+			log.Printf("[INFO] Processing file: %s", f.Name())
 			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
 			if err != nil {
+				log.Printf("[ERROR] Failed to get file info for %s: %v", f.Name(), err)
 				return Query{}, fmt.Errorf("error getting file size for %s: %w", filepath.Join(dir, f.Name()), err)
 			}
 
 			fileContent, err := os.ReadFile(filepath.Join(dir, f.Name()))
 			if err != nil {
+				log.Printf("[ERROR] Failed to read file %s: %v", f.Name(), err)
 				return Query{}, fmt.Errorf("error reading file %s: %w", filepath.Join(dir, f.Name()), err)
 			}
 
@@ -88,9 +96,11 @@ func ProcessDirectory(dir string) (Query, error) {
 				FormattedSize: formatFileSize(fileInfo.Size()),
 			}
 			folder.FileList = append(folder.FileList, file)
+			log.Printf("[INFO] Successfully processed file: %s (size: %s)", f.Name(), file.FormattedSize)
 		}
 	}
 
 	query.Folders = append(query.Folders, folder)
+	log.Printf("[INFO] Successfully processed directory: %s", dir)
 	return query, nil
 }

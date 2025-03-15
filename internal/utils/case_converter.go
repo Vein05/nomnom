@@ -1,6 +1,7 @@
 package nomnom
 
 import (
+	"log"
 	"strings"
 	"unicode"
 
@@ -14,6 +15,8 @@ func ConvertCase(str string, fromCase string, toCase string) string {
 	if str == "" {
 		return ""
 	}
+
+	log.Printf("[INFO] Converting case from %s to %s", fromCase, toCase)
 
 	var words []string
 	caser := cases.Title(language.English)

@@ -1,7 +1,6 @@
 package nomnom
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -17,8 +16,7 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 	baseURL := "https://openrouter.ai/api/v1/"
 	client := deepseek.NewClient(os.Getenv("OPENROUTER_API_KEY"), baseURL)
 
-	// print the model
-	fmt.Println("Using model:", config.AI.Model)
+	log.Printf("[INFO] Using OpenRouter model: %s", config.AI.Model)
 
 	opts := QueryOpts{
 		Model: config.AI.Model,
@@ -26,9 +24,10 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 	}
 
 	if err := SendQueryToLLM(client, query, opts); err != nil {
-		log.Fatalf("error: %v", err)
+		log.Printf("[ERROR] Failed to process query with OpenRouter: %v", err)
 		return contentprocessors.Query{}, err
 	}
 
+	log.Printf("[INFO] Successfully processed query with OpenRouter")
 	return query, nil
 }
