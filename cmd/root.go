@@ -7,7 +7,7 @@ import (
 
 	aideepseek "nomnom/internal/ai"
 	contentprocessors "nomnom/internal/content"
-	configutils "nomnom/internal/utils"
+	utils "nomnom/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -17,8 +17,8 @@ type args struct {
 	configPath  string
 	autoApprove bool
 	dryRun      bool
-	verbose     bool
 	log         bool
+	revert      string
 }
 
 var cmdArgs = &args{}
@@ -28,9 +28,67 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI tool to rename files using AI",
 	Long:  `NomNom is a command-line tool that renames files in a folder based on their content using AI models.`,
 	Run: func(cmd *cobra.Command, _ []string) {
+		// Check if revert flag is set
+		if cmdArgs.revert != "" {
+			fmt.Println("\n[1/3] Loading changes file...")
+			changeLog, err := utils.LoadLog(cmdArgs.revert)
+			if err != nil {
+				fmt.Printf("Error loading changes file: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Println("[2/3] Setting up revert logger...")
+			// Create a new logger for the revert operation
+			// Use the directory of the first entry as the base directory for logs
+			var baseDir string
+			if len(changeLog.Entries) > 0 {
+				baseDir = filepath.Dir(changeLog.Entries[0].OriginalPath)
+			} else {
+				baseDir = "."
+			}
+			logger, err := utils.NewLogger(cmdArgs.log, baseDir)
+			if err != nil {
+				fmt.Printf("Error creating logger: %v\n", err)
+				os.Exit(1)
+			}
+			defer logger.Close()
+
+			fmt.Println("[3/3] Reverting changes...")
+			for _, entry := range changeLog.Entries {
+				if entry.Success {
+					// Create necessary directories
+					if err := os.MkdirAll(filepath.Dir(entry.OriginalPath), 0755); err != nil {
+						fmt.Printf("Error creating directory for %s: %v\n", entry.OriginalPath, err)
+						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
+						continue
+					}
+
+					// Copy file back to original location
+					input, err := os.ReadFile(entry.NewPath)
+					if err != nil {
+						fmt.Printf("Error reading file %s: %v\n", entry.NewPath, err)
+						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
+						continue
+					}
+
+					if err := os.WriteFile(entry.OriginalPath, input, 0644); err != nil {
+						fmt.Printf("Error writing file %s: %v\n", entry.OriginalPath, err)
+						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
+						continue
+					}
+
+					// Log successful revert operation
+					logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, true, nil)
+					fmt.Printf("Reverted: %s -> %s\n", filepath.Base(entry.NewPath), filepath.Base(entry.OriginalPath))
+				}
+			}
+			fmt.Println("\nRevert operation completed.")
+			return
+		}
+
 		fmt.Println("\n[1/6] Loading configuration...")
 		// Load configuration
-		config := configutils.LoadConfig(cmdArgs.configPath)
+		config := utils.LoadConfig(cmdArgs.configPath)
 
 		fmt.Println("[2/6] Creating new query...")
 		// Create a new query
@@ -40,7 +98,6 @@ var rootCmd = &cobra.Command{
 			cmdArgs.configPath,
 			cmdArgs.autoApprove,
 			cmdArgs.dryRun,
-			cmdArgs.verbose,
 			cmdArgs.log,
 		)
 		if err != nil {
@@ -108,14 +165,20 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&cmdArgs.dir, "dir", "d", "", "Source directory containing files to rename (required)")
+	rootCmd.Flags().StringVarP(&cmdArgs.dir, "dir", "d", "", "Source directory containing files to rename (required when not using revert)")
 	rootCmd.Flags().StringVarP(&cmdArgs.configPath, "config", "c", "config.json", "Path to the JSON configuration file")
 	rootCmd.Flags().BoolVarP(&cmdArgs.autoApprove, "auto-approve", "y", false, "Automatically approve changes without user confirmation")
 	rootCmd.Flags().BoolVarP(&cmdArgs.dryRun, "dry-run", "n", true, "Preview changes without actually renaming files")
-	rootCmd.Flags().BoolVarP(&cmdArgs.verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.Flags().BoolVarP(&cmdArgs.log, "log", "l", true, "Enable logging to file")
+	rootCmd.Flags().StringVarP(&cmdArgs.revert, "revert", "r", "", "Path to the changes file to revert operations from")
 
-	rootCmd.MarkFlagRequired("dir")
+	// Add a PreRunE to validate flags
+	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if cmdArgs.revert == "" && cmdArgs.dir == "" {
+			return fmt.Errorf("required flag \"dir\" not set when not using revert")
+		}
+		return nil
+	}
 
 	rootCmd.SetHelpCommand(&cobra.Command{
 		Use:    "help",
