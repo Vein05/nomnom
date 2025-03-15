@@ -6,6 +6,7 @@ import (
 	"fmt"
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
+	"strings"
 
 	utils "nomnom/internal/utils"
 
@@ -98,7 +99,12 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			}
 
 			// convert the response to the given case in the config
-			file.NewName = utils.ConvertCase(response.Choices[0].Message.Content, "snake", opts.Case)
+			newName := utils.ConvertCase(response.Choices[0].Message.Content, "snake", opts.Case)
+
+			// remove new lines and spaces from the new name
+			newName = strings.ReplaceAll(newName, "\n", "")
+			newName = strings.ReplaceAll(newName, " ", "")
+			file.NewName = newName
 		}
 	}
 	return nil
