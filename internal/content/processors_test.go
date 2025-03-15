@@ -43,7 +43,7 @@ func TestNewQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.autoApprove, tt.dryRun, tt.verbose, tt.log)
+			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.autoApprove, tt.dryRun, tt.log)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -67,8 +67,9 @@ func TestNewSafeProcessor(t *testing.T) {
 
 	processor := NewSafeProcessor(query, output)
 	if processor == nil {
-		t.Error("NewSafeProcessor() returned nil")
+		t.Fatal("NewSafeProcessor() returned nil")
 	}
+
 	if processor.query != query {
 		t.Error("NewSafeProcessor() did not set query correctly")
 	}
