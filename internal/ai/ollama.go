@@ -18,7 +18,12 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 
 	fmt.Println("Using Ollama model:", config.AI.OllamaModel)
 
-	if err := SendQueryToLLM(client, query, QueryOpts{Model: config.AI.OllamaModel}); err != nil {
+	opts := QueryOpts{
+		Model: config.AI.OllamaModel,
+		Case:  config.Case,
+	}
+
+	if err := SendQueryToLLM(client, query, opts); err != nil {
 		log.Fatalf("error: %v", err)
 		return contentprocessors.Query{}, err
 	}

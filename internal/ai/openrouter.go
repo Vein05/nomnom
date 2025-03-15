@@ -22,6 +22,7 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 
 	opts := QueryOpts{
 		Model: config.AI.Model,
+		Case:  config.Case,
 	}
 
 	if err := SendQueryToLLM(client, query, opts); err != nil {
