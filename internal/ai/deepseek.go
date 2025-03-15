@@ -2,7 +2,6 @@ package nomnom
 
 import (
 	"log"
-	"os"
 
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
@@ -16,16 +15,7 @@ func SendQueryWithDeepSeek(config configutils.Config, query contentprocessors.Qu
 
 	// check if config.ai.apikey is set
 
-	var apiKey string
-
-	if config.AI.APIKey == "" {
-		log.Println("No API key found in config, using environment variable DEEPSEEK_API_KEY. If you want to use a different API key, set config.ai.apikey in your config.json file.")
-		apiKey = os.Getenv("DEEPSEEK_API_KEY")
-	} else {
-		apiKey = config.AI.APIKey
-	}
-
-	client := deepseek.NewClient(apiKey)
+	client := deepseek.NewClient(config.AI.APIKey)
 
 	opts := QueryOpts{
 		Model: deepseek.DeepSeekChat,
