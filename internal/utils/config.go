@@ -62,6 +62,7 @@ func LoadConfig(path string) Config {
 
 		// check the os type and set the path accordingly
 		if runtime.GOOS == "windows" {
+			// windows uses backslashes for paths and we set out config file in
 			path = "config.json"
 		} else {
 			path = "config.json"
