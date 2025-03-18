@@ -42,14 +42,26 @@
    - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
    - Windows: Download installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
 
-2. Install Go package:
+2. Clone and install NomNom:
 ```bash
-go install github.com/yourusername/nomnom@latest
+# Clone the repository
+git clone https://github.com/vein05/nomnom.git
+cd nomnom
+
+# Make it executable
+chmod +x nomnom
+
+# Move binary to your PATH (macOS/Linux)
+sudo mv nomnom /usr/local/bin/
+
+# Create config directory and copy default config(after adding your API Keys or making changes)
+mkdir -p ~/.config/nomnom
+cp config.json ~/.config/nomnom/
 ```
 
 ## Quick Start 🚀
 
-1. Create a `config.json` file (or use the default one):
+The configuration file is located at `~/.config/nomnom/config.json`. Edit it to include your settings:
 ```json
 {
   "output": "./renamed",
