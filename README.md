@@ -1,8 +1,13 @@
 # NomNom 
 
-A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intelligently rename multiple files at once by analyzing their content and generating meaningful names using state-of-the-art AI models.
+<div style="display: flex; justify-content: center; gap: 2rem; padding: 1rem;">
+  <img src="nomnom.png" alt="nomnom-logo" height=120 width=120 style="border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  <div style="flex: 1; max-width: 600px;">
+    <p> A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intelligently rename multiple files at once by analyzing their content and generating meaningful names using state-of-the-art AI models.
+    </p>
+  </div>
+</div>
 
-!["nomnom-pic"](nomnom.png)
 
 ## Features ✨
 
@@ -178,7 +183,7 @@ The revert functionality will allow you to:
 
 Stay tuned for the revert command implementation!
 
-## Contributing ��
+## Contributing 
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
