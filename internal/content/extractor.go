@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	fileutils "nomnom/internal/files"
 )
 
 const (
@@ -70,13 +72,13 @@ func ProcessDirectory(dir string) (Query, error) {
 			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
 			if err != nil {
 				log.Printf("[ERROR] Failed to get file info for %s: %v", f.Name(), err)
-				return Query{}, fmt.Errorf("error getting file size for %s: %w", filepath.Join(dir, f.Name()), err)
+				continue // Skip this file and continue with the next one
 			}
 
-			fileContent, err := os.ReadFile(filepath.Join(dir, f.Name()))
+			fileContent, err := fileutils.ReadFile(filepath.Join(dir, f.Name()))
 			if err != nil {
-				log.Printf("[ERROR] Failed to read file %s: %v", f.Name(), err)
-				return Query{}, fmt.Errorf("error reading file %s: %w", filepath.Join(dir, f.Name()), err)
+				log.Printf("[ERROR] Failed to read file %s with content: %v and error: %v", f.Name(), fileContent, err)
+				continue // Skip this file and continue with the next one
 			}
 
 			context := fmt.Sprintf("Content: %s\nFile: %s\nFolder: %s\nType: %s\nSize: %s",
