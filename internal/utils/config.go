@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"runtime"
 )
 
 type Config struct {
@@ -58,6 +59,13 @@ func LoadConfig(path string) Config {
 	// check if path is empty
 	if path == "" {
 		path = "config.json"
+
+		// check the os type and set the path accordingly
+		if runtime.GOOS == "windows" {
+			path = "config.json"
+		} else {
+			path = "config.json"
+		}
 	}
 
 	file, err := os.ReadFile(path)
