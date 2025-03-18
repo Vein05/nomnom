@@ -22,6 +22,16 @@ func SendQueryWithDeepSeek(config configutils.Config, query contentprocessors.Qu
 		Case:  config.Case,
 	}
 
+	// check if config.ai.max_tokens is set
+	if config.AI.MaxTokens != 0 {
+		opts.MaxTokens = config.AI.MaxTokens
+	}
+
+	// check if config.ai.temperature is set
+	if config.AI.Temperature != 0 {
+		opts.Temperature = config.AI.Temperature
+	}
+
 	if err := SendQueryToLLM(client, query, opts); err != nil {
 		log.Fatalf("error: %v", err)
 		return contentprocessors.Query{}, err
