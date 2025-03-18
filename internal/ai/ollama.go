@@ -15,10 +15,10 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 	baseURL := "http://localhost:11434/api/"
 	client := deepseek.NewClient("", baseURL) // No API key needed for local Ollama
 
-	log.Printf("[INFO] Using Ollama model: %s", config.AI.OllamaModel)
+	log.Printf("[INFO] Using Ollama model: %s", config.AI.Model)
 
 	opts := QueryOpts{
-		Model: config.AI.OllamaModel,
+		Model: config.AI.Model,
 		Case:  config.Case,
 	}
 
