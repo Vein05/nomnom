@@ -2,9 +2,10 @@ package nomnom
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"runtime"
+
+	log "github.com/charmbracelet/log"
 )
 
 type Config struct {
@@ -20,10 +21,10 @@ type Config struct {
 type AIConfig struct {
 	Provider    string  `json:"provider"`
 	Model       string  `json:"model"`
-	APIKey      string  `json:"api_key"`
-	OllamaModel string  `json:"ollama_model"`
-	MaxTokens   int     `json:"max_tokens"`
-	Temperature float64 `json:"temperature"`
+	APIKey      string  `json:"api_key,omitempty"`
+	MaxTokens   int     `json:"max_tokens,omitempty"`
+	Temperature float64 `json:"temperature,omitempty"`
+	Prompt      string  `json:"prompt,omitempty"`
 }
 
 type FileHandlingConfig struct {
@@ -58,16 +59,22 @@ type LoggingConfig struct {
 func LoadConfig(path string) Config {
 	// check if path is empty
 	if path == "" {
-		path = "config.json"
+		path = "./config.json"
 
 		// check the os type and set the path accordingly
 		if runtime.GOOS == "windows" {
 			// windows uses backslashes for paths and we set out config file in
-			path = "config.json"
+			path = "./config.json"
 		} else {
-			path = "config.json"
+			home, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatalf("Failed to get user home directory: %v", err)
+			}
+			path = home + "/.config/nomnom/config.json"
 		}
 	}
+
+	log.Info("Loading: ", "config", path)
 
 	file, err := os.ReadFile(path)
 	if err != nil {
