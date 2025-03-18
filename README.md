@@ -1,6 +1,8 @@
-# NomNom 🍽️
+# NomNom 
 
 A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intelligently rename multiple files at once by analyzing their content and generating meaningful names using state-of-the-art AI models.
+
+!["nomnom-pic"](nomnom.png)
 
 ## Features ✨
 
