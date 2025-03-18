@@ -1,6 +1,7 @@
 package nomnom
 
 import (
+	utils "nomnom/internal/utils"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,7 @@ func TestNewQuery(t *testing.T) {
 		prompt      string
 		dir         string
 		configPath  string
+		config      utils.Config
 		autoApprove bool
 		dryRun      bool
 		verbose     bool
@@ -43,7 +45,7 @@ func TestNewQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.autoApprove, tt.dryRun, tt.log)
+			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.config, tt.autoApprove, tt.dryRun, tt.log)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return
