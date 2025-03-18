@@ -27,6 +27,14 @@ A powerful Go CLI tool for bulk renaming files using AI. NomNom helps you intell
 
 ## Installation
 
+### Prerequisites
+
+1. Install Tesseract OCR:
+   - macOS: `brew install tesseract`
+   - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+   - Windows: Download installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
+
+2. Install Go package:
 ```bash
 go install github.com/yourusername/nomnom@latest
 ```
