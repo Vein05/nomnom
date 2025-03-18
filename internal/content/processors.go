@@ -2,10 +2,13 @@ package nomnom
 
 import (
 	"fmt"
-	"log"
+	"strconv"
+
 	utils "nomnom/internal/utils"
 	"os"
 	"path/filepath"
+
+	log "github.com/charmbracelet/log"
 )
 
 // Query represents the query parameters for content processing.
@@ -35,12 +38,12 @@ type SafeProcessor struct {
 }
 
 // NewQuery creates a new Query object with the given parameters.
-func NewQuery(prompt string, dir string, configPath string, autoApprove bool, dryRun bool, log bool) (*Query, error) {
-	if prompt == "" {
-		prompt = "What is the title of this document? Only respond with the title."
+func NewQuery(prompt string, dir string, configPath string, config utils.Config, autoApprove bool, dryRun bool, log bool) (*Query, error) {
+	if prompt == "" || config.AI.Prompt == "" {
+		prompt = "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
 	}
 
-	folders, err := ProcessDirectory(dir)
+	folders, err := ProcessDirectory(dir, config)
 	if err != nil {
 		return nil, fmt.Errorf("error processing directory: %w", err)
 	}
@@ -72,36 +75,37 @@ func NewSafeProcessor(query *Query, output string) *SafeProcessor {
 
 // Process handles the safe mode processing workflow
 func (p *SafeProcessor) Process() ([]ProcessResult, error) {
-	log.Printf("[INFO] Starting safe mode processing")
+	log.Info("Starting safe mode processing")
 	results := make([]ProcessResult, 0)
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(p.output, 0755); err != nil {
-		log.Printf("[ERROR] Failed to create output directory: %v", err)
+		log.Error("Failed to create output directory: %v", err)
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
-	log.Printf("[INFO] Created output directory: %s", p.output)
+	log.Info("Created output directory: %s", p.output)
 
 	// First phase: Copy all files with original structure
 	if !p.query.DryRun {
-		log.Printf("[INFO] Starting file copy phase")
+		log.Info("Starting file copy phase")
 		if err := p.copyOriginalStructure(); err != nil {
-			log.Printf("[ERROR] Failed to copy original structure: %v", err)
+			log.Error("Failed to copy original structure: %v", err)
 			return nil, fmt.Errorf("failed to copy original structure: %w", err)
 		}
-		log.Printf("[INFO] Completed file copy phase")
+		log.Info("Completed file copy phase")
 	}
 
 	// Second phase: Process and rename files
-	log.Printf("[INFO] Starting file processing phase")
+	log.Info("Starting file processing phase")
 	for _, folder := range p.query.Folders {
 		// Get the output folder path
 		outFolder := filepath.Join(p.output, folder.Name)
-		log.Printf("[INFO] Processing folder: %s", folder.Name)
+		log.Info("Processing folder: ", "folder", folder.Name, "files", len(folder.FileList))
 
 		// Process each file
+		counter := 0
 		for _, file := range folder.FileList {
-			log.Printf("[INFO] Processing file: %s", file.Name)
+			log.Info("Processing file: ", "file", file.Name, "size", file.FormattedSize)
 			result := ProcessResult{
 				OriginalPath: file.Path,
 				Success:      true,
@@ -116,15 +120,19 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 
 				// In non-dry-run mode, rename the copied file
 				if !p.query.DryRun {
+					// before renaming, check if the file exists, if it exsits add for n to the end of the new name
+					if _, err := os.Stat(result.NewPath); err == nil {
+						result.NewPath = filepath.Join(outFolder, file.NewName+"_"+strconv.Itoa(counter))
+					}
 					if err := os.Rename(currentPath, result.NewPath); err != nil {
-						log.Printf("[ERROR] Failed to rename file %s to %s: %v", file.Name, file.NewName, err)
+						log.Error("Failed to rename file: ", "file", file.Name, "to", file.NewName, "error", err)
 						result.Success = false
 						result.Error = fmt.Errorf("failed to rename file: %w", err)
 					} else {
-						log.Printf("[INFO] Successfully renamed file %s to %s", file.Name, file.NewName)
+						log.Info("Successfully renamed file: ", "file", file.Name, "to", file.NewName)
 					}
 				} else {
-					log.Printf("[INFO] Dry run: Would rename %s to %s", file.Name, file.NewName)
+					log.Info("Dry run: Would rename ", "file", file.Name, "to", file.NewName)
 				}
 
 				// Log the operation if logging is enabled
@@ -132,35 +140,36 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 					// Convert paths to absolute
 					absOrigPath, err := filepath.Abs(file.Path)
 					if err != nil {
-						log.Printf("[WARN] Could not get absolute path for %s: %v", file.Path, err)
+						log.Error("Could not get absolute path for: ", "path", file.Path, "error", err)
 						absOrigPath = file.Path
 					}
 					absNewPath, err := filepath.Abs(result.NewPath)
 					if err != nil {
-						log.Printf("[WARN] Could not get absolute path for %s: %v", result.NewPath, err)
+						log.Error("Could not get absolute path for: ", "path", result.NewPath, "error", err)
 						absNewPath = result.NewPath
 					}
 					p.query.Logger.LogOperation(absOrigPath, absNewPath, result.Success, result.Error)
 				}
 			} else {
 				result.NewPath = currentPath
-				log.Printf("[INFO] No new name generated for %s", file.Name)
+				log.Info("No new name generated for: ", "file", file.Name)
 			}
 
 			results = append(results, result)
+			counter++
 		}
 	}
 
 	// Close the logger if it exists
 	if p.query.Logger != nil {
 		if err := p.query.Logger.Close(); err != nil {
-			log.Printf("[WARN] Failed to close logger: %v", err)
+			log.Error("Failed to close logger: ", "error", err)
 		} else {
-			log.Printf("[INFO] Successfully closed logger")
+			log.Info("Successfully closed logger")
 		}
 	}
 
-	log.Printf("[INFO] Completed file processing phase")
+	log.Info("Completed file processing phase")
 	return results, nil
 }
 
@@ -170,19 +179,19 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 		// Create corresponding folder in output directory
 		outFolder := filepath.Join(p.output, folder.Name)
 		if err := os.MkdirAll(outFolder, 0755); err != nil {
-			log.Printf("[ERROR] Failed to create output folder %s: %v", outFolder, err)
+			log.Error("Failed to create output folder %s: %v", outFolder, err)
 			return fmt.Errorf("failed to create output folder %s: %w", outFolder, err)
 		}
-		log.Printf("[INFO] Created output folder: %s", outFolder)
+		log.Info("Created output folder: %s", outFolder)
 
 		// Copy each file with original name
 		for _, file := range folder.FileList {
 			dstPath := filepath.Join(outFolder, file.Name)
 			if err := copyFile(file.Path, dstPath); err != nil {
-				log.Printf("[ERROR] Failed to copy file %s: %v", file.Path, err)
+				log.Error("Failed to copy file %s: %v", file.Path, err)
 				return fmt.Errorf("failed to copy file %s: %w", file.Path, err)
 			}
-			log.Printf("[INFO] Copied file: %s to %s", file.Path, dstPath)
+			log.Info("Copied file: %s to %s", file.Path, dstPath)
 		}
 	}
 	return nil
@@ -190,18 +199,18 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 
 // copyFile copies a file from src to dst
 func copyFile(src, dst string) error {
-	log.Printf("[INFO] Copying file from %s to %s", src, dst)
+	log.Info("Copying file from: ", "src", src, "dst", dst)
 	input, err := os.ReadFile(src)
 	if err != nil {
-		log.Printf("[ERROR] Failed to read source file %s: %v", src, err)
+		log.Error("Failed to read source file: ", "src", src, "err", err)
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
 	if err := os.WriteFile(dst, input, 0644); err != nil {
-		log.Printf("[ERROR] Failed to write destination file %s: %v", dst, err)
+		log.Error("Failed to write destination file: ", "dst", dst, "err", err)
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 
-	log.Printf("[INFO] Successfully copied file")
+	log.Info("Successfully copied file from: ", "src", src, "dst", dst)
 	return nil
 }
