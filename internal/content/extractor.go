@@ -2,11 +2,15 @@ package nomnom
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	fileutils "nomnom/internal/files"
+	utils "nomnom/internal/utils"
+
+	log "github.com/charmbracelet/log"
 )
 
 const (
@@ -43,9 +47,53 @@ func formatFileSize(size int64) string {
 	}
 }
 
+// write a reverse of formatFileSize that understands the units
+func convertSize(size string) (int64, error) {
+	size = strings.ToLower(size)
+	// check if the size is in bytes
+	if strings.HasSuffix(size, "kb") {
+		// remove the k
+		size = strings.TrimSuffix(size, "kb")
+		b, err := strconv.ParseInt(size, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return b * KB, nil
+	}
+	if strings.HasSuffix(size, "mb") {
+		// remove the m
+		size = strings.TrimSuffix(size, "mb")
+		b, err := strconv.ParseInt(size, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return b * MB, nil
+	}
+	if strings.HasSuffix(size, "gb") {
+		// remove the g
+		size = strings.TrimSuffix(size, "gb")
+		b, err := strconv.ParseInt(size, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return b * GB, nil
+	}
+
+	if strings.HasSuffix(size, "b") {
+		// remove the b
+		size = strings.TrimSuffix(size, "b")
+		b, err := strconv.ParseInt(size, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return b, nil
+	}
+
+	return 0, fmt.Errorf("invalid size: %s", size)
+}
+
 // ProcessDirectory processes a directory and returns a Query object
-func ProcessDirectory(dir string) (Query, error) {
-	log.Printf("[INFO] Processing directory: %s", dir)
+func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 	var query Query
 
 	// create a new FolderType object
@@ -58,33 +106,45 @@ func ProcessDirectory(dir string) (Query, error) {
 	// read the directory
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Printf("[ERROR] Failed to read directory %s: %v", dir, err)
+		log.Error("Failed to read directory %s: %v", dir, err)
 		return Query{}, fmt.Errorf("error reading directory %s: %w", dir, err)
 	}
 
-	log.Printf("[INFO] Found %d files in directory", len(files))
+	log.Info("Found: ", "directory", dir, "files", len(files))
 
 	// iterate over the files in the directory
 	for _, f := range files {
 		// if it's a file, process it
 		if !f.IsDir() {
-			log.Printf("[INFO] Processing file: %s", f.Name())
 			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
+
 			if err != nil {
-				log.Printf("[ERROR] Failed to get file info for %s: %v", f.Name(), err)
+				log.Error("Failed to get file info for: ", "file", f.Name(), "error", err)
 				continue // Skip this file and continue with the next one
+			}
+
+			if config.FileHandling.MaxSize != "" {
+				// check if the file is too large
+				maxSize, err := convertSize(config.FileHandling.MaxSize)
+				if err != nil {
+					log.Error("Failed to parse max size: ", "error", err)
+					continue // Skip this file and continue with the next one
+				}
+				if fileInfo.Size() > maxSize {
+					log.Info("File: ", "file", f.Name(), "size", fileInfo.Size(), "is too large to process")
+					continue // Skip this file and continue with the next one
+				}
 			}
 
 			fileContent, err := fileutils.ReadFile(filepath.Join(dir, f.Name()))
 			if err != nil {
-				log.Printf("[ERROR] Failed to read file %s with content: %v and error: %v", f.Name(), fileContent, err)
+				log.Error("Failed to read file: ", "file", f.Name(), "error", err)
 				continue // Skip this file and continue with the next one
 			}
 
-			context := fmt.Sprintf("Content: %s\nFile: %s\nFolder: %s\nType: %s\nSize: %s",
+			context := fmt.Sprintf("Content: %s\nFile: %s\nType: %s\nSize: %s",
 				string(fileContent),
 				f.Name(),
-				dir,
 				filepath.Ext(f.Name()),
 				formatFileSize(fileInfo.Size()),
 			)
@@ -98,11 +158,11 @@ func ProcessDirectory(dir string) (Query, error) {
 				FormattedSize: formatFileSize(fileInfo.Size()),
 			}
 			folder.FileList = append(folder.FileList, file)
-			log.Printf("[INFO] Successfully processed file: %s (size: %s)", f.Name(), file.FormattedSize)
+			log.Info("Successfully processed file: ", "file", f.Name(), "size", file.FormattedSize)
 		}
 	}
 
 	query.Folders = append(query.Folders, folder)
-	log.Printf("[INFO] Successfully processed directory: %s", dir)
+	log.Info("Successfully processed directory: ", "directory", dir)
 	return query, nil
 }
