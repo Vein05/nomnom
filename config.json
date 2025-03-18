@@ -1,6 +1,6 @@
 {
   "output": "./renamed",
-  "case": "camel",
+  "case": "snake",
   "ai": {
     "provider": "openrouter",
     "model": "google/gemini-2.0-flash-001",
@@ -9,8 +9,6 @@
     "temperature": 0.7
   },
   "file_handling": {
-    "include": ["pdf", "docx", "txt"],
-    "exclude": ["mp4", "mp3"],
     "max_size": "100MB",
     "skip_errors": false,
     "keep_originals": false,
