@@ -64,7 +64,7 @@ cp config.json ~/.config/nomnom/
 The configuration file is located at `~/.config/nomnom/config.json`. Edit it to include your settings:
 ```json
 {
-  "output": "./renamed",
+  "output": "",
   "case": "snake", // camel, kebab, pascal
   "ai": {
     "provider": "deepseek",
@@ -91,11 +91,11 @@ nomnom --dir <directory> [flags]
 | Flag           | Short | Description                                     |
 |---------------|--------|-------------------------------------------------|
 | --dir         | -d    | Source directory containing files to rename      |
-| --config      | -c    | Path to config file (default: "config.json")     |
+| --config      | -c    | Path to config file   |
 | --auto-approve| -y    | Automatically approve changes                    |
-| --dry-run     | -n    | Preview changes without renaming                 |
-| --verbose     | -v    | Enable verbose logging                          |
+| --dry-run     | -n    | Preview changes without renaming (default: true)                |
 | --log         | -l    | Enable operation logging (default: true)        |
+| --revert | -r | Rever changes from the log file |
 
 ### Configuration
 
