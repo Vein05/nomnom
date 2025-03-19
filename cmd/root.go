@@ -112,7 +112,7 @@ var rootCmd = &cobra.Command{
 		log.Info("[3/6] Setting up output directory...")
 		outputDir := config.Output
 		if outputDir == "" {
-			outputDir = filepath.Join(cmdArgs.dir, "renamed")
+			outputDir = filepath.Join(cmdArgs.dir, "nomnom", "renamed")
 		}
 
 		log.Info("[4/6] Processing files with AI to generate new names...")
