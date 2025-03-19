@@ -1,5 +1,5 @@
 {
-  "output": "./renamed",
+  "output": "", 
   "case": "snake",
   "ai": {
     "provider": "openrouter",
@@ -11,9 +11,7 @@
   },
   "file_handling": {
     "max_size": "100MB",
-    "skip_errors": false,
-    "keep_originals": false,
-    "backup": false
+    "auto_approve": false
   },
   "content_extraction": {
     "extract_text": true,
