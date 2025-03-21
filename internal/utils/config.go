@@ -22,18 +22,14 @@ type AIConfig struct {
 	Provider    string  `json:"provider"`
 	Model       string  `json:"model"`
 	APIKey      string  `json:"api_key,omitempty"`
-	MaxTokens   int     `json:"max_tokens,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
-	Prompt      string  `json:"prompt,omitempty"`
+	MaxTokens   int     `json:"max_tokens"`
+	Temperature float64 `json:"temperature"`
+	Prompt      string  `json:"prompt"`
 }
 
 type FileHandlingConfig struct {
-	Include       []string `json:"include"`
-	Exclude       []string `json:"exclude"`
-	MaxSize       string   `json:"max_size"`
-	SkipErrors    bool     `json:"skip_errors"`
-	KeepOriginals bool     `json:"keep_originals"`
-	Backup        bool     `json:"backup"`
+	MaxSize     string `json:"max_size"`
+	AutoApprove bool   `json:"auto_approve"`
 }
 
 type ContentExtractionConfig struct {
@@ -51,9 +47,8 @@ type PerformanceConfig struct {
 }
 
 type LoggingConfig struct {
-	LogLevel string `json:"log_level"`
-	LogFile  string `json:"log_file"`
-	NoColor  bool   `json:"no_color"`
+	Enabled bool   `json:"enabled"`
+	LogPath string `json:"log_path"`
 }
 
 func LoadConfig(path string) Config {
