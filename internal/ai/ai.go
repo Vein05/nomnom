@@ -56,6 +56,8 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 	if aiModel != "ollama" {
 		if config.AI.APIKey == "" {
 			log.Info("No API key set for AI provider, checking environment variables")
+
+			// we check if the api key is set in the environment variables
 			if os.Getenv("DEEPSEEK_API_KEY") != "" && (aiModel == "deepseek" || aiModel == "") {
 				log.Info("Found deepseek API key in environment variable")
 				config.AI.APIKey = os.Getenv("DEEPSEEK_API_KEY")
@@ -108,46 +110,60 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		folder := &query.Folders[i]
 		log.Info("Processing folder: ", "folder", folder.Name)
 
-		// Iterate through the files in the folder
+		// Create a channel to collect results and errors
+		type result struct {
+			index int
+			name  string
+			err   error
+		}
+		// we create a channel to collect results and errors
+		results := make(chan result, len(folder.FileList))
+
+		// Process files concurrently
 		for j := range folder.FileList {
-			file := &folder.FileList[j]
-			log.Info("Processing file: ", "file", file.Name)
+			go func(j int, file *contentprocessors.File) {
+				// Create a chat completion request
+				request := &deepseek.ChatCompletionRequest{
+					Model: opts.Model,
+					Messages: []deepseek.ChatCompletionMessage{
+						{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
+						{Role: deepseek.ChatMessageRoleUser, Content: file.Context},
+					},
+				}
 
-			// Create a chat completion request
-			request := &deepseek.ChatCompletionRequest{
-				Model: opts.Model,
-				Messages: []deepseek.ChatCompletionMessage{
-					{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
-					{Role: deepseek.ChatMessageRoleUser, Content: file.Context},
-				},
+				// Send the request and handle the response
+				ctx := context.Background()
+				response, err := client.CreateChatCompletion(ctx, request)
+				if err != nil {
+					results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+					return
+				}
+
+				if response.Choices[0].Message.Content == "" {
+					results <- result{j, "", fmt.Errorf("empty response from AI")}
+					return
+				}
+
+				// Convert the response to the given case in the config
+				refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
+				newName := utils.ConvertCase(refinedName, "snake", opts.Case)
+
+				// Remove new lines and spaces from the new name
+				newName = strings.ReplaceAll(newName, "\n", "")
+				newName = strings.ReplaceAll(newName, " ", "")
+
+				results <- result{j, newName, nil}
+			}(j, &folder.FileList[j])
+		}
+
+		// Collect results
+		for range folder.FileList {
+			res := <-results
+			if res.err != nil {
+				log.Error("Failed to process file: ", "error", res.err)
+				continue
 			}
-
-			// Send the request and handle the response
-			ctx := context.Background()
-			response, err := client.CreateChatCompletion(ctx, request)
-			if err != nil {
-				log.Error("Failed to create chat completion: ", "error", err)
-				return fmt.Errorf("error creating chat completion: %v", err)
-			}
-			// add a check to see if the response is empty
-			if response.Choices[0].Message.Content == "" {
-				log.Error("Received empty response from AI")
-				return fmt.Errorf("empty response from AI")
-			}
-
-			// convert the response to the given case in the config
-			refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
-			newName := utils.ConvertCase(refinedName, "snake", opts.Case)
-
-			// print this only once even if for loop is running
-			if i == 0 && j == 0 {
-				log.Info("Converting case from: ", "from", "snake", "to", opts.Case)
-			}
-
-			// remove new lines and spaces from the new name
-			newName = strings.ReplaceAll(newName, "\n", "")
-			newName = strings.ReplaceAll(newName, " ", "")
-			file.NewName = newName
+			folder.FileList[res.index].NewName = res.name
 		}
 	}
 	return nil
