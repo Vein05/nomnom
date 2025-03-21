@@ -7,6 +7,7 @@ import (
 
 	aideepseek "nomnom/internal/ai"
 	contentprocessors "nomnom/internal/content"
+	files "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 
 	log "github.com/charmbracelet/log"
@@ -32,59 +33,16 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, _ []string) {
 		// Check if revert flag is set
 		if cmdArgs.revert != "" {
-			log.Info("[1/3] Loading changes file...")
-			changeLog, err := utils.LoadLog(cmdArgs.revert)
-			if err != nil {
-				log.Error("Error loading changes file: %v", err)
+			opts := files.RevertOptions{
+				ChangeLogPath: cmdArgs.revert,
+				EnableLogging: cmdArgs.log,
+				AutoApprove:   cmdArgs.autoApprove,
+			}
+
+			if err := files.ProcessRevert(opts); err != nil {
+				log.Error("Error processing revert: ", "error", err)
 				os.Exit(1)
 			}
-
-			log.Info("[2/3] Setting up revert logger...")
-			// Create a new logger for the revert operation
-			// Use the directory of the first entry as the base directory for logs
-			var baseDir string
-			if len(changeLog.Entries) > 0 {
-				baseDir = filepath.Dir(changeLog.Entries[0].OriginalPath)
-			} else {
-				baseDir = "."
-			}
-			logger, err := utils.NewLogger(cmdArgs.log, baseDir)
-			if err != nil {
-				log.Error("Error creating logger: %v", err)
-				os.Exit(1)
-			}
-			defer logger.Close()
-
-			log.Info("[3/3] Reverting changes...")
-			for _, entry := range changeLog.Entries {
-				if entry.Success {
-					// Create necessary directories
-					if err := os.MkdirAll(filepath.Dir(entry.OriginalPath), 0755); err != nil {
-						log.Error("Error creating directory for %s: %v", entry.OriginalPath, err)
-						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
-						continue
-					}
-
-					// Copy file back to original location
-					input, err := os.ReadFile(entry.NewPath)
-					if err != nil {
-						log.Error("Error reading file %s: %v", entry.NewPath, err)
-						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
-						continue
-					}
-
-					if err := os.WriteFile(entry.OriginalPath, input, 0644); err != nil {
-						log.Error("Error writing file %s: %v", entry.OriginalPath, err)
-						logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, false, err)
-						continue
-					}
-
-					// Log successful revert operation
-					logger.LogOperationWithType(entry.NewPath, entry.OriginalPath, utils.OperationRevert, true, nil)
-					log.Info("Reverted: %s -> %s", filepath.Base(entry.NewPath), filepath.Base(entry.OriginalPath))
-				}
-			}
-			log.Info("Revert operation completed.")
 			return
 		}
 
@@ -104,7 +62,7 @@ var rootCmd = &cobra.Command{
 			cmdArgs.log,
 		)
 		if err != nil {
-			log.Error("Error creating query: %v", err)
+			log.Error("Error creating query: ", "error", err)
 			os.Exit(1)
 		}
 
@@ -119,7 +77,7 @@ var rootCmd = &cobra.Command{
 		// Process files with AI to get new names
 		aiResult, err := aideepseek.HandleAI(config, *query)
 		if err != nil {
-			log.Error("Error processing with AI: %v", err)
+			log.Error("Error processing with AI: ", "error", err)
 			os.Exit(1)
 		}
 		// Update query with AI results
@@ -130,7 +88,7 @@ var rootCmd = &cobra.Command{
 		processor := contentprocessors.NewSafeProcessor(query, outputDir)
 		results, err := processor.Process()
 		if err != nil {
-			log.Error("Error processing files: %v", err)
+			log.Error("Error processing files: ", "error", err)
 			os.Exit(1)
 		}
 
@@ -147,12 +105,12 @@ var rootCmd = &cobra.Command{
 					log.Info("Would rename:",
 						"from", filepath.Base(result.OriginalPath),
 						"to", filepath.Base(result.NewPath),
-						"status", "--")
+						"status", "🔍 DRY RUN")
 				} else {
 					log.Info("Renamed:",
 						"from", filepath.Base(result.OriginalPath),
 						"to", filepath.Base(result.NewPath),
-						"status", "✅ SUCCESS")
+						"status", "✅ DONE")
 				}
 			} else {
 				log.Error("Failed to process:",
@@ -164,14 +122,18 @@ var rootCmd = &cobra.Command{
 
 		fmt.Printf("\n📈 Summary Stats")
 		fmt.Printf("\n═══════════════\n")
-		log.Info("Results:",
-			"successful", successCount,
-			"failed", len(results)-successCount,
-			"total", len(results))
-
 		if cmdArgs.dryRun {
-			log.Info("This was a dry run - no files were modified",
-				"note", "Run with --dry-run=false to apply changes")
+			log.Info("Results (Dry Run):",
+				"would rename", successCount,
+				"failed", len(results)-successCount,
+				"total", len(results))
+			log.Info("To apply these changes, run:",
+				"command", "nomnom -d \""+cmdArgs.dir+"\" --dry-run=false")
+		} else {
+			log.Info("Results:",
+				"renamed", successCount,
+				"failed", len(results)-successCount,
+				"total", len(results))
 		}
 	},
 }
@@ -188,7 +150,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&cmdArgs.autoApprove, "auto-approve", "y", false, "Automatically approve changes without user confirmation")
 	rootCmd.Flags().BoolVarP(&cmdArgs.dryRun, "dry-run", "n", true, "Preview changes without actually renaming files")
 	rootCmd.Flags().BoolVarP(&cmdArgs.log, "log", "l", true, "Enable logging to file")
-	rootCmd.Flags().StringVarP(&cmdArgs.revert, "revert", "r", "", "Path to the changes file to revert operations from")
+	rootCmd.Flags().StringVarP(&cmdArgs.revert, "revert_path", "r", "", "Path to the changes file to revert operations from")
 
 	// Add a PreRunE to validate flags
 	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
