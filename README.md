@@ -33,16 +33,29 @@
   - Support for reverting changes
 - ↩️ **Revert Support**: Ability to undo rename operations using logged history
 
+### Things to know
+- You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
+  ```bash
+  # For DeepSeek
+  export DEEPSEEK_API_KEY="your-deepseek-api-key"
+
+  # For OpenRouter
+  export OPENROUTER_API_KEY="your-openrouter-api-key"
+  ```
+
+NomNom will automatically detect and use these environment variables if no API keys are specified in the config file.
+
 ## Installation
 
-### Prerequisites
-
-1. Install Tesseract OCR:
+### Requirements
+Install Tesseract OCR:
    - macOS: `brew install tesseract`
    - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
    - Windows: Download installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
 
-2. Clone and install NomNom:
+### MacOS/Linux
+Clone and install NomNom:
+
 ```bash
 # Clone the repository
 git clone https://github.com/vein05/nomnom.git
@@ -51,12 +64,35 @@ cd nomnom
 # Make it executable
 chmod +x nomnom
 
-# Move binary to your PATH (macOS/Linux)
+# Move binary to your PATH
 sudo mv nomnom /usr/local/bin/
 
 # Create config directory and copy default config(after adding your API Keys or making changes)
 mkdir -p ~/.config/nomnom
 cp config.example.json ~/.config/nomnom/config.json
+```
+
+### Windows
+
+```
+# Clone the repository
+git clone https://github.com/vein05/nomnom.git
+cd nomnom
+
+# Create the config directory in AppData\Roaming
+mkdir -p $env:APPDATA\nomnom
+
+# Edit and Copy the example config file
+copy config.example.json $env:APPDATA\nomnom\config.json
+
+# Add the executable to PATH (Option 1 - User's AppData)
+copy nomnom.exe $env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\
+
+# Alternative (Option 2 - Create a custom tools directory)
+mkdir -p $env:USERPROFILE\Tools
+copy nomnom.exe $env:USERPROFILE\Tools\
+# Then add %USERPROFILE%\Tools to your PATH in Windows Environment Variables
+
 ```
 
 ## Quick Start 🚀
@@ -116,7 +152,7 @@ NomNom uses a JSON configuration file with the following options:
   - Timeout settings
   - Retry configuration
 
-See the full configuration example in `config.json`.
+See the full configuration example in `config.example.json`.
 
 ### AI Provider Examples
 
