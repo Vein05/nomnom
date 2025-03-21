@@ -49,9 +49,12 @@ func NewQuery(prompt string, dir string, configPath string, config utils.Config,
 		return nil, fmt.Errorf("error processing directory: %w", err)
 	}
 
-	logger, err := utils.NewLogger(log, dir)
-	if err != nil {
-		return nil, fmt.Errorf("error creating logger: %w", err)
+	var logger *utils.Logger
+	if !dryRun {
+		logger, err = utils.NewLogger(log, dir)
+		if err != nil {
+			return nil, fmt.Errorf("error creating logger: %w", err)
+		}
 	}
 
 	return &Query{
@@ -79,12 +82,16 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	log.Info("Starting safe mode processing")
 	results := make([]ProcessResult, 0)
 
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(p.output, 0755); err != nil {
-		log.Error("Failed to create output directory: %v", err)
-		return nil, fmt.Errorf("failed to create output directory: %w", err)
+	if p.query.DryRun {
+		log.Info("Dry run: Would create output directory")
+	} else {
+		// Create output directory if it doesn't exist
+		if err := os.MkdirAll(p.output, 0755); err != nil {
+			log.Error("Failed to create output directory: %v", err)
+			return nil, fmt.Errorf("failed to create output directory: %w", err)
+		}
+		log.Info("Created output directory:", "directory", p.output)
 	}
-	log.Info("Created output directory:", "directory", p.output)
 
 	// First phase: Copy all files with original structure
 	if !p.query.DryRun {
@@ -160,7 +167,7 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 				}
 
 				// Log the operation if logging is enabled
-				if p.query.Logger != nil {
+				if p.query.Logger != nil && !p.query.DryRun {
 					// Convert paths to absolute
 					absOrigPath, err := filepath.Abs(file.Path)
 					if err != nil {
