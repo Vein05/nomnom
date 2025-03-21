@@ -56,23 +56,14 @@ sudo mv nomnom /usr/local/bin/
 
 # Create config directory and copy default config(after adding your API Keys or making changes)
 mkdir -p ~/.config/nomnom
-cp config.json ~/.config/nomnom/
+cp config.example.json ~/.config/nomnom/config.json
 ```
 
 ## Quick Start 🚀
 
-The configuration file is located at `~/.config/nomnom/config.json`. Edit it to include your settings:
-```json
-{
-  "output": "",
-  "case": "snake", // camel, kebab, pascal
-  "ai": {
-    "provider": "deepseek",
-    "model": "deepseek-v3",
-    "api_key": "your-api-key"
-  }
-}
-```
+1. Create/Edit the config
+
+The configuration file is located or should be created at `~/.config/nomnom/config.json`. You can see the config example in `config.example.json`.
 
 2. Run NomNom:
 ```bash
@@ -91,11 +82,11 @@ nomnom --dir <directory> [flags]
 | Flag           | Short | Description                                     |
 |---------------|--------|-------------------------------------------------|
 | --dir         | -d    | Source directory containing files to rename      |
-| --config      | -c    | Path to config file   |
+| --config      | -c    | Path to config file (default: ~/.config/nomnom/config.json)  |
 | --auto-approve| -y    | Automatically approve changes                    |
 | --dry-run     | -n    | Preview changes without renaming (default: true)                |
 | --log         | -l    | Enable operation logging (default: true)        |
-| --revert | -r | Rever changes from the log file |
+| --revert      | -r    | Revert changes from the log file               |
 
 ### Configuration
 
@@ -186,15 +177,96 @@ NomNom includes a robust logging system that tracks all file operations:
   }
   ```
 
-#### Revert Operations (Coming Soon)
-The revert functionality will allow you to:
-- List available operation logs
-- View details of specific rename sessions
-- Revert changes from a specific session
-- Perform dry-run reverts to preview changes
-- Selectively revert specific files
+#### Revert Operations
+The revert functionality allows you to restore files to their original names in a safe manner:
 
-Stay tuned for the revert command implementation!
+- Files are restored to a new directory: `nomnom/reverted/{session_id}`
+- Original file structure is preserved
+- Detailed logs of the revert operation are maintained
+
+To revert changes:
+```bash
+
+# Log possible changes from a specific log file
+nomnom --revert path/to/changes_timestamp.json
+
+# Example:
+nomnom  --revert .nomnom/logs/changes_20240321_100000.json
+
+# Apply the revert
+nomnom --revert .nomnom/logs/changes_20240321_100000.json --dry-run=false
+
+```
+
+The revert operation will:
+1. Create a new directory for reverted files
+2. Copy files with their original names
+3. Maintain the original directory structure
+4. Log all revert operations
+5. Display progress and results in the terminal
+
+Note: The revert operation is non-destructive - it creates copies of files rather than moving or deleting existing ones.
+
+## Commands
+
+<details open> 
+ <summary>Basic nomnom execution (Preview Mode)</summary>
+
+```bash 
+nomnom -d "~/Documents/ResearchPapers/" 
+```
+</details>
+
+<details> 
+ <summary>Execute rename operation</summary>
+
+```bash 
+nomnom -d "~/Documents/ResearchPapers/" --dry-run=false
+```
+</details>
+
+<details>
+ <summary>Use custom config file</summary>
+
+```bash
+nomnom -d "~/Documents/ResearchPapers/" --config ~/.config/nomnom/custom-config.json
+```
+</details>
+
+<details>
+ <summary>Auto-approve all changes</summary>
+
+```bash
+nomnom -d "~/Documents/ResearchPapers/" --auto-approve=false --dry-run=false
+```
+</details>
+
+<details>
+ <summary>Disable logging</summary>
+
+```bash
+nomnom -d "~/Documents/ResearchPapers/" --log=false
+```
+</details>
+
+<details>
+ <summary>Using short flag notation</summary>
+
+```bash
+# Same as the basic execution but with short flags
+nomnom -d "~/Documents/ResearchPapers/" -y -n=false
+```
+</details>
+
+<details>
+ <summary>Revert previous changes (Coming Soon)</summary>
+
+```bash
+nomnom --revert
+# or
+nomnom -r
+```
+</details>
 
 ## Contributing 
 
