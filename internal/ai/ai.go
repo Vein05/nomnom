@@ -4,6 +4,7 @@ package nomnom
 import (
 	"context"
 	"fmt"
+	"time"
 
 	contentprocessors "nomnom/internal/content"
 	"os"
@@ -23,6 +24,12 @@ type QueryOpts struct {
 	Case        string
 	MaxTokens   int
 	Temperature float64
+}
+
+type result struct {
+	index int
+	name  string
+	err   error
 }
 
 // HandleAI is a function that handles the AI model selection and query execution and returns the result.
@@ -105,54 +112,41 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 
 // SendQueryToLLM sends a query to an LLM API to generate new file names
 func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts QueryOpts) error {
+	// load config
+	config := utils.LoadConfig(query.ConfigPath)
+	performanceOpts := config.Performance.AI
+	workers := performanceOpts.Workers
+	timeout := performanceOpts.Timeout
+	retries := performanceOpts.Retries
+
+	log.Info("Nomnom: AI processing is running with: ", "workers", workers, "timeout", timeout, "retries", retries)
+
+	parsedTimeout, err := time.ParseDuration(timeout)
+	if err != nil {
+		log.Error("Failed to parse timeout: ", "error", err)
+		return err
+	}
+
+	client.Timeout = parsedTimeout
+
+	// Create a semaphore channel to limit concurrent workers
+	sem := make(chan struct{}, workers)
+
 	// Iterate through the folders
 	for i := range query.Folders {
 		folder := &query.Folders[i]
 		log.Info("Processing folder: ", "folder", folder.Name)
 
-		// Create a channel to collect results and errors
-		type result struct {
-			index int
-			name  string
-			err   error
-		}
 		// we create a channel to collect results and errors
 		results := make(chan result, len(folder.FileList))
 
-		// Process files concurrently
+		// Process files concurrently with worker limit
 		for j := range folder.FileList {
+			// Acquire a worker slot
+			sem <- struct{}{}
 			go func(j int, file *contentprocessors.File) {
-				// Create a chat completion request
-				request := &deepseek.ChatCompletionRequest{
-					Model: opts.Model,
-					Messages: []deepseek.ChatCompletionMessage{
-						{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
-						{Role: deepseek.ChatMessageRoleUser, Content: file.Context},
-					},
-				}
-
-				// Send the request and handle the response
-				ctx := context.Background()
-				response, err := client.CreateChatCompletion(ctx, request)
-				if err != nil {
-					results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
-					return
-				}
-
-				if response.Choices[0].Message.Content == "" {
-					results <- result{j, "", fmt.Errorf("empty response from AI")}
-					return
-				}
-
-				// Convert the response to the given case in the config
-				refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
-				newName := utils.ConvertCase(refinedName, "snake", opts.Case)
-
-				// Remove new lines and spaces from the new name
-				newName = strings.ReplaceAll(newName, "\n", "")
-				newName = strings.ReplaceAll(newName, " ", "")
-
-				results <- result{j, newName, nil}
+				defer func() { <-sem }() // Release the worker slot when done
+				doAI(j, file, opts, query, client, results)
 			}(j, &folder.FileList[j])
 		}
 
@@ -165,6 +159,64 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			}
 			folder.FileList[res.index].NewName = res.name
 		}
+
+		// if we have failed files, we retry them with a new worker
+		for retries > 0 {
+			failedFiles := 0
+			for i, file := range folder.FileList {
+				if file.NewName == "" {
+					failedFiles++
+					log.Info("Retrying failed file: ", "file", file.Name)
+					sem <- struct{}{} // Acquire a worker slot for retry
+					go func(i int, file *contentprocessors.File) {
+						defer func() { <-sem }() // Release the worker slot when done
+						doAI(i, file, opts, query, client, results)
+					}(i, &file)
+				}
+			}
+			if failedFiles == 0 {
+				break
+			}
+			retries--
+		}
+	}
+	// Wait for any remaining workers to finish
+	for range workers {
+		sem <- struct{}{}
 	}
 	return nil
+}
+
+func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
+	// Create a chat completion request
+	request := &deepseek.ChatCompletionRequest{
+		Model: opts.Model,
+		Messages: []deepseek.ChatCompletionMessage{
+			{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
+			{Role: deepseek.ChatMessageRoleUser, Content: file.Context},
+		},
+	}
+
+	// Send the request and handle the response
+	ctx := context.Background()
+	response, err := client.CreateChatCompletion(ctx, request)
+	if err != nil {
+		results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		return
+	}
+
+	if response.Choices[0].Message.Content == "" {
+		results <- result{j, "", fmt.Errorf("empty response from AI")}
+		return
+	}
+
+	// Convert the response to the given case in the config
+	refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
+	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
+
+	// Remove new lines and spaces from the new name
+	newName = strings.ReplaceAll(newName, "\n", "")
+	newName = strings.ReplaceAll(newName, " ", "")
+
+	results <- result{j, newName, nil}
 }
