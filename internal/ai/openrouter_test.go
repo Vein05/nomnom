@@ -15,12 +15,13 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 		t.Skip("OPENROUTER_API_KEY not set, skipping test")
 	}
 
-	config := configutils.LoadConfig("../../config.json") // Updated path to point to config in main folder
+	config := configutils.LoadConfig("") // Updated path to point to config in main folder
 
 	config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
 
 	// Create a test query with sample data
 	testQuery := contentprocessors.Query{
+		Prompt: config.AI.Prompt,
 		Folders: []contentprocessors.FolderType{
 			{
 				Name:       "TestFolder",
@@ -34,7 +35,7 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 					{
 						Name:    "presentation.ppt",
 						Path:    "/test/path/presentation.ppt",
-						Context: "This is a PowerPoint presentation about quarterly sales results for Q1 2024.",
+						Context: "This is a PowerPoint presentation about quarterly sales results for Q1 2024. ",
 					},
 					{
 						Name:    "report.pdf",
