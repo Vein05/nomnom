@@ -89,7 +89,7 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	results := make([]ProcessResult, 0)
 
 	if p.query.DryRun {
-		fmt.Printf("[2/6] Dry run: Would create output directory")
+		fmt.Printf("[2/6] Dry run: Would create output directory\n")
 	} else {
 		// Create output directory if it doesn't exist
 		if err := os.MkdirAll(p.output, 0755); err != nil {
