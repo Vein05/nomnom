@@ -10,8 +10,6 @@ import (
 	files "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 
-	log "github.com/charmbracelet/log"
-
 	"github.com/spf13/cobra"
 )
 
@@ -40,20 +38,20 @@ var rootCmd = &cobra.Command{
 			}
 
 			if err := files.ProcessRevert(opts); err != nil {
-				log.Error("Error processing revert: ", "error", err)
+				fmt.Printf("Error processing revert: %v\n", err)
 				os.Exit(1)
 			}
 			return
 		}
 
-		log.Info("[1/6] Loading configuration...")
+		fmt.Printf("[1/6] Loading configuration...\n")
 		// Load configuration
 		config := utils.LoadConfig(cmdArgs.configPath)
 
-		log.Info("[2/6] Creating new query...")
+		fmt.Printf("[2/6] Creating new query...\n")
 		// Create a new query
 		query, err := contentprocessors.NewQuery(
-			"What is a descriptive name for this file based on its content? Respond with just the filename.",
+			"",
 			cmdArgs.dir,
 			cmdArgs.configPath,
 			config,
@@ -62,22 +60,22 @@ var rootCmd = &cobra.Command{
 			cmdArgs.log,
 		)
 		if err != nil {
-			log.Error("Error creating query: ", "error", err)
+			fmt.Printf("Error creating query: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Set up output directory
-		log.Info("[3/6] Setting up output directory...")
+		fmt.Printf("[3/6] Setting up output directory...\n")
 		outputDir := config.Output
 		if outputDir == "" {
 			outputDir = filepath.Join(cmdArgs.dir, "nomnom", "renamed")
 		}
 
-		log.Info("[4/6] Processing files with AI to generate new names...")
+		fmt.Printf("[4/6] Processing files with AI to generate new names...\n")
 		// Process files with AI to get new names
 		aiResult, err := aideepseek.HandleAI(config, *query)
 		if err != nil {
-			log.Error("Error processing with AI: ", "error", err)
+			fmt.Printf("Error processing with AI: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -85,56 +83,50 @@ var rootCmd = &cobra.Command{
 		query.Folders = aiResult.Folders
 
 		// Create and run the safe processor
-		log.Info("[5/6] Processing file renames...")
+		fmt.Printf("[5/6] Processing file renames...\n")
 		processor := contentprocessors.NewSafeProcessor(query, outputDir)
 		results, err := processor.Process()
 		if err != nil {
-			log.Error("Error processing files: ", "error", err)
+			fmt.Printf("Error processing files: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Print processing results
-		log.Info("[6/6] Generating summary...")
-		fmt.Println("\n📊 Processing Results")
-		fmt.Println("══════════════════════")
+		fmt.Printf("[6/6] Generating summary...\n")
+		fmt.Printf("\n📊 Processing Results\n")
+		fmt.Printf("══════════════════════\n")
 
 		successCount := 0
 		for _, result := range results {
 			if result.Success {
 				successCount++
 				if cmdArgs.dryRun {
-					log.Info("Would rename:",
-						"from", filepath.Base(result.OriginalPath),
-						"to", filepath.Base(result.NewPath),
-						"status", "🔍 DRY RUN")
+					fmt.Printf("🔍 Would rename: %s → %s\n",
+						filepath.Base(result.OriginalPath),
+						filepath.Base(result.NewPath))
 				} else {
-					log.Info("Renamed:",
-						"from", filepath.Base(result.OriginalPath),
-						"to", filepath.Base(result.NewPath),
-						"status", "✅ DONE")
+					fmt.Printf("✅ Renamed: %s → %s\n",
+						filepath.Base(result.OriginalPath),
+						filepath.Base(result.NewPath))
 				}
 			} else {
-				log.Error("Failed to process:",
-					"file", filepath.Base(result.OriginalPath),
-					"error", result.Error,
-					"status", "❌ ERROR")
+				fmt.Printf("❌ Failed to process: %s (Error: %v)\n",
+					filepath.Base(result.OriginalPath),
+					result.Error)
 			}
 		}
 
 		fmt.Printf("\n📈 Summary Stats")
 		fmt.Printf("\n═══════════════\n")
 		if cmdArgs.dryRun {
-			log.Info("Results (Dry Run):",
-				"would rename", successCount,
-				"failed", len(results)-successCount,
-				"total", len(results))
-			log.Info("To apply these changes, run:",
-				"command", "nomnom -d \""+cmdArgs.dir+"\" --dry-run=false")
+			fmt.Printf("Would rename: %d files\n", successCount)
+			fmt.Printf("Failed: %d files\n", len(results)-successCount)
+			fmt.Printf("Total: %d files\n", len(results))
+			fmt.Printf("\nTo apply these changes, run: nomnom -d \"%s\" --dry-run=false\n", cmdArgs.dir)
 		} else {
-			log.Info("Results:",
-				"renamed", successCount,
-				"failed", len(results)-successCount,
-				"total", len(results))
+			fmt.Printf("Renamed: %d files\n", successCount)
+			fmt.Printf("Failed: %d files\n", len(results)-successCount)
+			fmt.Printf("Total: %d files\n", len(results))
 		}
 	},
 }
