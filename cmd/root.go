@@ -80,6 +80,7 @@ var rootCmd = &cobra.Command{
 			log.Error("Error processing with AI: ", "error", err)
 			os.Exit(1)
 		}
+
 		// Update query with AI results
 		query.Folders = aiResult.Folders
 
