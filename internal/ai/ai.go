@@ -4,6 +4,7 @@ package nomnom
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	contentprocessors "nomnom/internal/content"
@@ -14,8 +15,6 @@ import (
 	utils "nomnom/internal/utils"
 
 	deepseek "github.com/cohesion-org/deepseek-go"
-
-	log "github.com/charmbracelet/log"
 )
 
 // QueryOpts contains options for the query
@@ -41,40 +40,40 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 	// we currently check if we are serving deepseek, ollama or openrouter
 	if config.AI.Provider != "" {
 		if config.AI.Provider == "deepseek" {
-			log.Info("Using deepseek as AI provider")
+			log.Printf("🤖 Using deepseek as AI provider")
 			aiModel = "deepseek"
 		} else if config.AI.Provider == "ollama" {
-			log.Info("Using ollama as AI provider")
+			log.Printf("🤖 Using ollama as AI provider")
 			aiModel = "ollama"
 		} else if config.AI.Provider == "openrouter" {
-			log.Info("Using openrouter as AI provider")
+			log.Printf("🤖 Using openrouter as AI provider")
 			aiModel = "openrouter"
 		} else {
-			log.Error("Invalid AI provider: %s", config.AI.Provider)
+			log.Printf("❌ Invalid AI provider: %s", config.AI.Provider)
 			return contentprocessors.Query{}, fmt.Errorf("invalid AI provider: %s", config.AI.Provider)
 		}
 	} else {
 		aiModel = "deepseek"
-		log.Info("No AI provider set, defaulting to deepseek")
+		log.Printf("ℹ️ No AI provider set, defaulting to deepseek")
 	}
 
 	// now we check if have an api key for the provider, if not let the user know and default to env variable
 	// we skip ollama as it does not require an api key
 	if aiModel != "ollama" {
 		if config.AI.APIKey == "" {
-			log.Info("No API key set for AI provider, checking environment variables")
+			log.Printf("ℹ️ No API key set for AI provider, checking environment variables")
 
 			// we check if the api key is set in the environment variables
 			if os.Getenv("DEEPSEEK_API_KEY") != "" && (aiModel == "deepseek" || aiModel == "") {
-				log.Info("Found deepseek API key in environment variable")
+				log.Printf("✅ Found deepseek API key in environment variable")
 				config.AI.APIKey = os.Getenv("DEEPSEEK_API_KEY")
 				aiModel = "deepseek"
 			} else if os.Getenv("OPENROUTER_API_KEY") != "" && (aiModel == "openrouter" || aiModel == "") {
-				log.Info("Found openrouter API key in environment variable")
+				log.Printf("✅ Found openrouter API key in environment variable")
 				config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
 				aiModel = "openrouter"
 			} else {
-				log.Error("No API key found for %s provider", aiModel)
+				log.Printf("❌ No API key found for %s provider", aiModel)
 				return contentprocessors.Query{}, fmt.Errorf("no API key found for provider %s", aiModel)
 			}
 		}
@@ -119,11 +118,12 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 	timeout := performanceOpts.Timeout
 	retries := performanceOpts.Retries
 
-	log.Info("Nomnom: AI processing is running with: ", "workers", workers, "timeout", timeout, "retries", retries)
+	log.Printf("⚙️ AI processing configuration - Workers: %d, Timeout: %s, Retries: %d",
+		workers, timeout, retries)
 
 	parsedTimeout, err := time.ParseDuration(timeout)
 	if err != nil {
-		log.Error("Failed to parse timeout: ", "error", err)
+		log.Printf("❌ Failed to parse timeout: %v", err)
 		return err
 	}
 
@@ -135,7 +135,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 	// Iterate through the folders
 	for i := range query.Folders {
 		folder := &query.Folders[i]
-		log.Info("Processing folder: ", "folder", folder.Name)
+		log.Printf("📁 Processing folder: %s", folder.Name)
 
 		// we create a channel to collect results and errors
 		results := make(chan result, len(folder.FileList))
@@ -154,7 +154,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		for range folder.FileList {
 			res := <-results
 			if res.err != nil {
-				log.Error("Failed to process file: ", "error", res.err)
+				log.Printf("❌ Failed to process file: %v", res.err)
 				continue
 			}
 			folder.FileList[res.index].NewName = res.name
@@ -166,7 +166,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			for i, file := range folder.FileList {
 				if file.NewName == "" {
 					failedFiles++
-					log.Info("Retrying failed file: ", "file", file.Name)
+					log.Printf("🔄 Retrying failed file: %s", file.Name)
 					sem <- struct{}{} // Acquire a worker slot for retry
 					go func(i int, file *contentprocessors.File) {
 						defer func() { <-sem }() // Release the worker slot when done
@@ -189,6 +189,12 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 
 func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
 	// Create a chat completion request
+
+	if query.Prompt == "" {
+		results <- result{j, "", fmt.Errorf("no prompt provided")}
+		return
+	}
+
 	request := &deepseek.ChatCompletionRequest{
 		Model: opts.Model,
 		Messages: []deepseek.ChatCompletionMessage{
