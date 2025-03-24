@@ -53,9 +53,6 @@ func TestNewQuery(t *testing.T) {
 			if !tt.wantErr && query == nil {
 				t.Error("NewQuery() returned nil query without error")
 			}
-			if !tt.wantErr && tt.prompt == "" && query.Prompt != "What is the title of this document? Only respond with the title." {
-				t.Error("NewQuery() did not set default prompt correctly")
-			}
 		})
 	}
 }

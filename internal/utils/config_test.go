@@ -6,7 +6,7 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	config := LoadConfig("../../config.json")
+	config := LoadConfig("")
 	fmt.Println(config)
 }
 
