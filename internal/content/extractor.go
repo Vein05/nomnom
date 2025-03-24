@@ -35,6 +35,14 @@ type File struct {
 	FormattedSize string `json:"formatted_size,omitempty"`
 }
 
+type result struct {
+	File    File
+	Err     error
+	Workers int    `json:"workers,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	Retries int    `json:"retries,omitempty"`
+}
+
 func formatFileSize(size int64) string {
 	if size < KB {
 		return fmt.Sprintf("%dB", size)
@@ -94,6 +102,24 @@ func convertSize(size string) (int64, error) {
 
 // ProcessDirectory processes a directory and returns a Query object
 func ProcessDirectory(dir string, config utils.Config) (Query, error) {
+	performanceOpts := config.Performance.File
+	workers := performanceOpts.Workers
+	timeout := performanceOpts.Timeout
+	retries := performanceOpts.Retries
+
+	// set defaults if not provided
+	if workers == 0 {
+		workers = 1
+	}
+	if timeout == "" {
+		timeout = "30s"
+	}
+	if retries == 0 {
+		retries = 1
+	}
+
+	log.Info("Nomnom: File processing is running with: ", "workers", workers, "timeout", timeout, "retries", retries)
+
 	var query Query
 
 	// create a new FolderType object
@@ -112,57 +138,107 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 
 	log.Info("Found: ", "directory", dir, "files", len(files))
 
-	// iterate over the files in the directory
+	// Create buffered channels for results and semaphore for worker limiting
+	results := make(chan result, len(files))
+	sem := make(chan struct{}, workers) // Semaphore to limit concurrent operations
+	var validFiles []os.DirEntry
+
+	// First pass to check file sizes and collect valid files
 	for _, f := range files {
-		// if it's a file, process it
 		if !f.IsDir() {
 			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
-
 			if err != nil {
 				log.Error("Failed to get file info for: ", "file", f.Name(), "error", err)
-				continue // Skip this file and continue with the next one
+				continue
 			}
 
 			if config.FileHandling.MaxSize != "" {
-				// check if the file is too large
 				maxSize, err := convertSize(config.FileHandling.MaxSize)
 				if err != nil {
 					log.Error("Failed to parse max size: ", "error", err)
-					continue // Skip this file and continue with the next one
+					continue
 				}
 				if fileInfo.Size() > maxSize {
 					log.Info("File: ", "file", f.Name(), "size", fileInfo.Size(), "is too large to process")
-					continue // Skip this file and continue with the next one
+					continue
 				}
 			}
-
-			fileContent, err := fileutils.ReadFile(filepath.Join(dir, f.Name()))
-			if err != nil {
-				log.Error("Failed to read file: ", "file", f.Name(), "error", err)
-				continue // Skip this file and continue with the next one
-			}
-
-			context := fmt.Sprintf("Content: %s\nFile: %s\nType: %s\nSize: %s",
-				string(fileContent),
-				f.Name(),
-				filepath.Ext(f.Name()),
-				formatFileSize(fileInfo.Size()),
-			)
-
-			// create a new File object with context
-			file := File{
-				Name:          f.Name(),
-				Path:          filepath.Join(dir, f.Name()),
-				Size:          fileInfo.Size(),
-				Context:       context,
-				FormattedSize: formatFileSize(fileInfo.Size()),
-			}
-			folder.FileList = append(folder.FileList, file)
-			log.Info("Successfully processed file: ", "file", f.Name(), "size", file.FormattedSize)
+			validFiles = append(validFiles, f)
 		}
+	}
+
+	// Launch goroutines for all valid files with worker limiting
+	for _, f := range validFiles {
+		go func(f os.DirEntry) {
+			sem <- struct{}{} // Acquire semaphore
+			defer func() {
+				<-sem // Release semaphore when done
+			}()
+			processFile(f, dir, results)
+		}(f)
+	}
+
+	// Collect results
+	for range validFiles {
+		result := <-results
+		if result.Err != nil {
+			continue
+		}
+		folder.FileList = append(folder.FileList, result.File)
+		log.Info("Successfully processed file: ", "file", result.File.Name, "size", result.File.FormattedSize)
 	}
 
 	query.Folders = append(query.Folders, folder)
 	log.Info("Successfully processed directory: ", "directory", dir)
 	return query, nil
+}
+
+func readFiles(file string, results chan result) {
+	fileContent, err := fileutils.ReadFile(file)
+	if err != nil {
+		log.Error("Failed to read file: ", "file", file, "error", err)
+		results <- result{
+			File: File{},
+			Err:  err,
+		}
+		return
+	}
+	results <- result{
+		File: File{
+			Path:    file,
+			Context: string(fileContent),
+		},
+		Err: err,
+	}
+	close(results)
+}
+
+func processFile(f os.DirEntry, dir string, results chan result) {
+	fileInfo, _ := os.Stat(filepath.Join(dir, f.Name()))
+	resultChan := make(chan result, 1)
+	readFiles(filepath.Join(dir, f.Name()), resultChan)
+	fileResult := <-resultChan
+
+	if fileResult.Err != nil {
+		log.Error("Failed to read file: ", "file", f.Name(), "error", fileResult.Err)
+		results <- result{Err: fileResult.Err}
+		return
+	}
+
+	context := fmt.Sprintf("Content: %s\nFile: %s\nType: %s\nSize: %s",
+		fileResult.File.Context,
+		f.Name(),
+		filepath.Ext(f.Name()),
+		formatFileSize(fileInfo.Size()),
+	)
+
+	results <- result{
+		File: File{
+			Name:          f.Name(),
+			Path:          filepath.Join(dir, f.Name()),
+			Size:          fileInfo.Size(),
+			Context:       context,
+			FormattedSize: formatFileSize(fileInfo.Size()),
+		},
+	}
 }
