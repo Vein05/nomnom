@@ -13,6 +13,7 @@
 ## Features ✨
 
 - 🗂️ **Bulk Processing**: Rename entire folders of files in one go
+- 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference (more parallel features coming soon)
 - 📄 **Smart Content Analysis**: Supports various file types including:
   - Text files
   - Documents (PDF, DOCX)
@@ -32,6 +33,43 @@
   - Operation timestamps and status
   - Support for reverting changes
 - ↩️ **Revert Support**: Ability to undo rename operations using logged history
+
+### Parallel Processing 🔄
+
+NomNom uses parallel processing for both AI operations and file handling:
+
+- **Parallel AI Inference**: 
+  - Processes multiple files simultaneously through AI models
+  - Smart resource management for concurrent AI requests
+  - Configurable retry mechanisms for failed requests
+  - Automatic batch processing of files
+
+- **Parallel File Processing**:
+  - Concurrent file reading and content extraction
+  - Worker pool-based processing for efficient I/O operations
+  - Safe file operations with semaphore-based concurrency control
+  - Automatic file size validation and filtering
+
+- **Configurable Settings**:
+  ```json
+  {
+    "performance": {
+      "ai": {
+        "workers": 5,        // Number of concurrent AI workers
+        "timeout": "30s",    // AI operation timeout
+        "retries": 1        // Number of retries for failed AI requests
+      },
+      "file": {
+        "workers": 5,        // Number of concurrent file workers
+        "timeout": "30s",    // File operation timeout
+        "retries": 1        // Number of retries for failed file operations
+      }
+    }
+  }
+  ```
+
+
+> **Note**: The parallel processing system is designed to be efficient while preventing system overload. The number of workers and timeouts can be adjusted based on your system's capabilities and requirements.
 
 ### Things to know
 - You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
