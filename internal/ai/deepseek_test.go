@@ -24,6 +24,7 @@ func TestSendQuery(t *testing.T) {
 
 	// Create a test query with sample data
 	testQuery := contentprocessors.Query{
+		Prompt: "What is the title of this document? Only respond with the title and extension in snake case.",
 		Folders: []contentprocessors.FolderType{
 			{
 				Name:       "TestFolder",
