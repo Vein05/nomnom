@@ -15,7 +15,7 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 	baseURL := "http://localhost:11434/api/"
 	client := deepseek.NewClient("", baseURL) // No API key needed for local Ollama
 
-	log.Printf("[INFO] Using Ollama model: %s", config.AI.Model)
+	log.Printf("🤖 Using Ollama model: %s", config.AI.Model)
 
 	opts := QueryOpts{
 		Model: config.AI.Model,
@@ -23,10 +23,10 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 	}
 
 	if err := SendQueryToLLM(client, query, opts); err != nil {
-		log.Printf("[ERROR] Failed to process query with Ollama: %v", err)
+		log.Printf("❌ Failed to process query with Ollama: %v", err)
 		return contentprocessors.Query{}, err
 	}
 
-	log.Printf("[INFO] Successfully processed query with Ollama")
+	log.Printf("✅ Successfully processed query with Ollama")
 	return query, nil
 }

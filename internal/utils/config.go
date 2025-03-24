@@ -2,10 +2,11 @@ package nomnom
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime"
 
-	log "github.com/charmbracelet/log"
+	log "log"
 )
 
 type Config struct {
@@ -80,16 +81,16 @@ func LoadConfig(path string) Config {
 		}
 	}
 
-	log.Info("Loading: ", "config", path)
+	fmt.Printf("[1/6] Loading config from: %s\n", path)
 
 	file, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatalf("Failed to read config file: %v", err)
+		log.Fatalf("❌ Failed to read config file: %v", err)
 	}
 
 	var config Config
 	if err := json.Unmarshal(file, &config); err != nil {
-		log.Fatalf("Failed to parse config file: %v", err)
+		log.Fatalf("❌ Failed to parse config file: %v", err)
 	}
 
 	return config
