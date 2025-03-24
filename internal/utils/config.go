@@ -41,9 +41,20 @@ type ContentExtractionConfig struct {
 }
 
 type PerformanceConfig struct {
+	AI   PerformanceAIConfig   `json:"ai,omitempty"`
+	File PerformanceFileConfig `json:"file,omitempty"`
+}
+
+type PerformanceAIConfig struct {
+	Workers int    `json:"workers,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	Retries int    `json:"retries,omitempty"`
+}
+
+type PerformanceFileConfig struct {
 	Workers int    `json:"workers"`
-	Timeout string `json:"timeout"`
-	Retries int    `json:"retries"`
+	Timeout string `json:"timeout,omitempty"`
+	Retries int    `json:"retries,omitempty"`
 }
 
 type LoggingConfig struct {
