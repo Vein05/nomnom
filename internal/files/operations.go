@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	log "github.com/charmbracelet/log"
+	log "log"
 
 	"github.com/dhowden/tag"
 	"github.com/gen2brain/go-fitz"
@@ -228,8 +228,8 @@ func readMetadata(path string) (string, error) {
 
 	//if text is empty or only contains one line, just return no context and print a log
 	if text == "" || strings.Count(text, "\n") <= 1 {
-		log.Error("No metadata found for file: " + path)
-		return "No metadata found for file: " + text + path, nil
+		log.Printf("No metadata found for file: %s", path)
+		return "[2/6] No metadata found for file: " + text + path, nil
 	}
 
 	return text, nil

@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 
-	log "github.com/charmbracelet/log"
+	log "log"
 )
 
 const (
@@ -118,9 +119,10 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		retries = 1
 	}
 
-	log.Info("Nomnom: File processing is running with: ", "workers", workers, "timeout", timeout, "retries", retries)
+	fmt.Printf("[2/6] Nomnom: File processing is running with: %d workers, %s timeout, %d retries\n", workers, timeout, retries)
 
 	var query Query
+	var wg sync.WaitGroup
 
 	// create a new FolderType object
 	folder := FolderType{
@@ -132,11 +134,11 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 	// read the directory
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Error("Failed to read directory %s: %v", dir, err)
+		log.Printf("❌ Failed to read directory %s: %v", dir, err)
 		return Query{}, fmt.Errorf("error reading directory %s: %w", dir, err)
 	}
 
-	log.Info("Found: ", "directory", dir, "files", len(files))
+	fmt.Printf("[2/6] Found %d files in directory: %s\n", len(files), dir)
 
 	// Create buffered channels for results and semaphore for worker limiting
 	results := make(chan result, len(files))
@@ -148,18 +150,18 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		if !f.IsDir() {
 			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
 			if err != nil {
-				log.Error("Failed to get file info for: ", "file", f.Name(), "error", err)
+				log.Printf("❌ Failed to get file info for: %s, error: %v", f.Name(), err)
 				continue
 			}
 
 			if config.FileHandling.MaxSize != "" {
 				maxSize, err := convertSize(config.FileHandling.MaxSize)
 				if err != nil {
-					log.Error("Failed to parse max size: ", "error", err)
+					log.Printf("❌ Failed to parse max size: %v", err)
 					continue
 				}
 				if fileInfo.Size() > maxSize {
-					log.Info("File: ", "file", f.Name(), "size", fileInfo.Size(), "is too large to process")
+					fmt.Printf("File: %s, size: %d, is too large to process\n", f.Name(), fileInfo.Size())
 					continue
 				}
 			}
@@ -169,7 +171,9 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 
 	// Launch goroutines for all valid files with worker limiting
 	for _, f := range validFiles {
+		wg.Add(1)
 		go func(f os.DirEntry) {
+			defer wg.Done()
 			sem <- struct{}{} // Acquire semaphore
 			defer func() {
 				<-sem // Release semaphore when done
@@ -178,6 +182,9 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		}(f)
 	}
 
+	// wait for all the files to be processed
+	wg.Wait()
+
 	// Collect results
 	for range validFiles {
 		result := <-results
@@ -185,18 +192,17 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 			continue
 		}
 		folder.FileList = append(folder.FileList, result.File)
-		log.Info("Successfully processed file: ", "file", result.File.Name, "size", result.File.FormattedSize)
 	}
 
 	query.Folders = append(query.Folders, folder)
-	log.Info("Successfully processed directory: ", "directory", dir)
+	fmt.Printf("[2/6] Successfully processed directory: %s\n", dir)
 	return query, nil
 }
 
 func readFiles(file string, results chan result) {
 	fileContent, err := fileutils.ReadFile(file)
 	if err != nil {
-		log.Error("Failed to read file: ", "file", file, "error", err)
+		log.Printf("❌ Failed to read file: %s, error: %v", file, err)
 		results <- result{
 			File: File{},
 			Err:  err,
@@ -210,7 +216,6 @@ func readFiles(file string, results chan result) {
 		},
 		Err: err,
 	}
-	close(results)
 }
 
 func processFile(f os.DirEntry, dir string, results chan result) {
@@ -220,7 +225,7 @@ func processFile(f os.DirEntry, dir string, results chan result) {
 	fileResult := <-resultChan
 
 	if fileResult.Err != nil {
-		log.Error("Failed to read file: ", "file", f.Name(), "error", fileResult.Err)
+		log.Printf("❌ Failed to read file: %s, error: %v", f.Name(), fileResult.Err)
 		results <- result{Err: fileResult.Err}
 		return
 	}
