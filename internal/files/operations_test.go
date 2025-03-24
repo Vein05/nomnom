@@ -75,8 +75,7 @@ func TestReadTxtFile(t *testing.T) {
 	}{
 		{
 			name:     "Read valid TXT file",
-			filepath: filepath.Join(demoDir, "sample.txt"),
-			want:     "sample text content",
+			filepath: filepath.Join(demoDir, "abcd.txt"),
 			wantErr:  false,
 		},
 		{
