@@ -1,6 +1,10 @@
 package nomnom
 
-import "strings"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
 
 func RefinedName(name string) string {
 	// remove new lines and spaces from the name
@@ -14,4 +18,16 @@ func RefinedName(name string) string {
 	name = strings.ReplaceAll(name, "```", "")
 
 	return name
+}
+
+func CheckAndAddExtension(s string, file string) string {
+	// Check if the string has an extension
+	if strings.Contains(s, ".") {
+		return s
+	}
+	extension := filepath.Ext(file)
+	// Add a default extension
+
+	fmt.Printf("extension: %s\n", extension)
+	return s + extension
 }
