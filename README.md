@@ -16,9 +16,9 @@
 - 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference (more parallel features coming soon)
 - 📄 **Smart Content Analysis**: Supports various file types including:
   - Text files
-  - Documents (PDF, DOCX)
+  - Documents (PDF, DOCX) - First 2 pages analyzed for context
   - Presentations
-  - Images (metadata)
+  - Images (metadata and OCR text extraction)
   - Videos (metadata)
 - 🤖 **AI-Powered**: Multiple AI provider options:
   - DeepSeek V3/R1 model
@@ -27,11 +27,14 @@
 - 👀 **Preview Mode**: Review generated names before applying changes
 - 🎯 **Flexible Naming**: Supports different casing options (snake_case, camelCase, kebab, pascal.)
 - 🔒 **Safe Operations**: Creates a separate directory for renamed files
+  - Automatic handling of duplicate file names with incremental suffixes
+  - Interactive approval process with "approve all" option
 - 📝 **Operation Logging**: Detailed logs of all rename operations with:
   - Full absolute paths for reliable tracking
   - Original and new file locations
   - Operation timestamps and status
   - Support for reverting changes
+  - Detailed error information and processing statistics
 - ↩️ **Revert Support**: Ability to undo rename operations using logged history
 
 ### Parallel Processing 🔄
@@ -349,3 +352,40 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License 📄
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+
+### Content Extraction Settings
+- `extract_text`: Enable text extraction from files
+- `extract_metadata`: Enable metadata extraction
+- `max_content_length`: Maximum content length to process (default: 5000 characters)
+- `skip_large_files`: Skip processing of files larger than the specified size limit
+- `read_context`: Enable reading file context for better naming
+
+### Performance
+
+NomNom includes comprehensive tests for all major components. To run the tests:
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests for specific package
+go test ./internal/ai
+go test ./internal/content
+go test ./internal/files
+```
+
+#### Test Requirements
+- DEEPSEEK_API_KEY environment variable for DeepSeek tests
+- OPENROUTER_API_KEY environment variable for OpenRouter tests
+- Ollama running locally for Ollama tests
+- Tesseract OCR installed for image processing tests
+
+#### Test Coverage
+The test suite covers:
+- AI model integration (DeepSeek, OpenRouter, Ollama)
+- File processing and renaming operations
+- Content extraction from various file types
+- Safe mode operations
+- Logging and revert functionality
+- Configuration handling
+- Error cases and edge conditions
