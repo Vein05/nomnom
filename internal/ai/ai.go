@@ -128,7 +128,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 
 	fmt.Printf("The parsed timeout is: %s\n", parsedTimeout)
 
-	// client.Timeout = parsedTimeout
+	client.Timeout = parsedTimeout
 
 	// Create a semaphore channel to limit concurrent workers
 	sem := make(chan struct{}, workers)
