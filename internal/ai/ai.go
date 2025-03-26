@@ -226,6 +226,7 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 	// Remove new lines and spaces from the new name
 	newName = strings.ReplaceAll(newName, "\n", "")
 	newName = strings.ReplaceAll(newName, " ", "")
+	newName = fileutils.CheckAndAddExtension(newName, file.Name)
 
 	results <- result{j, newName, nil}
 }
