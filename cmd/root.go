@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	aideepseek "nomnom/internal/ai"
+	ai "nomnom/internal/ai"
 	contentprocessors "nomnom/internal/content"
 	files "nomnom/internal/files"
 	utils "nomnom/internal/utils"
@@ -73,7 +73,7 @@ var rootCmd = &cobra.Command{
 
 		fmt.Printf("[4/6] Processing files with AI to generate new names...\n")
 		// Process files with AI to get new names
-		aiResult, err := aideepseek.HandleAI(config, *query)
+		aiResult, err := ai.HandleAI(config, *query)
 		if err != nil {
 			fmt.Printf("Error processing with AI: %v\n", err)
 			os.Exit(1)
