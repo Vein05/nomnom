@@ -126,8 +126,6 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		return err
 	}
 
-	fmt.Printf("The parsed timeout is: %s\n", parsedTimeout)
-
 	client.Timeout = parsedTimeout
 
 	// Create a semaphore channel to limit concurrent workers
@@ -195,9 +193,6 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 		results <- result{j, "", fmt.Errorf("no prompt provided")}
 		return
 	}
-
-	fmt.Printf("Just checking if we reach here or not\n")
-
 	request := &deepseek.ChatCompletionRequest{
 		Model: opts.Model,
 		Messages: []deepseek.ChatCompletionMessage{
