@@ -230,7 +230,7 @@ func processFile(f os.DirEntry, dir string, results chan result) {
 		return
 	}
 
-	context := fmt.Sprintf("Content: %s\nFile: %s\nType: %s\nSize: %s",
+	context := fmt.Sprintf("Content: %s\nFile: %s Extension Type: %s\nSize: %s",
 		fileResult.File.Context,
 		f.Name(),
 		filepath.Ext(f.Name()),
