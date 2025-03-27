@@ -74,6 +74,18 @@ NomNom uses parallel processing for both AI operations and file handling:
 
 > **Note**: The parallel processing system is designed to be efficient while preventing system overload. The number of workers and timeouts can be adjusted based on your system's capabilities and requirements.
 
+### File Name Validation
+
+NomNom includes comprehensive file name validation to ensure safe and compatible renaming:
+
+- Checks for invalid characters in file names
+- Validates against Windows reserved names
+- Enforces path length limits
+- Removes leading/trailing spaces and periods
+- Handles duplicate file names with incremental suffixes
+
+Note: All the validation is done in `internal/files/validation.go`.
+
 ### Things to know
 - You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
   ```bash
