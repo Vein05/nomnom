@@ -34,6 +34,7 @@ type File struct {
 	Context       string `json:"context,omitempty"`
 	Size          int64  `json:"size,omitempty"`
 	FormattedSize string `json:"formatted_size,omitempty"`
+	FailedReason  string `json:"failed_reason,omitempty"`
 }
 
 type result struct {
@@ -138,7 +139,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		return Query{}, fmt.Errorf("error reading directory %s: %w", dir, err)
 	}
 
-	fmt.Printf("[2/6] Found %d files in directory: %s\n", len(files), dir)
+	fmt.Printf("[2/6] Found %d items in directory: %s\n", len(files), dir)
 
 	// Create buffered channels for results and semaphore for worker limiting
 	results := make(chan result, len(files))
@@ -166,6 +167,9 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 				}
 			}
 			validFiles = append(validFiles, f)
+		}
+		if f.IsDir() {
+			fmt.Printf("[2/6] Skipping sub-directory: %q\n", f.Name())
 		}
 	}
 
