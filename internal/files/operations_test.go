@@ -2,6 +2,7 @@ package nomnom
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -234,5 +235,27 @@ func TestReadMetadata(t *testing.T) {
 				t.Errorf("readMetadata() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestListFiles(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	t.Logf("The current directory is: %s", wd)
+
+	files, err := os.ReadDir("../../demo")
+	if err != nil {
+		log.Fatal(err)
+	}
+	t.Logf("The files in the demo directory are: %d", len(files))
+	for _, file := range files {
+		if file.IsDir() {
+			t.Logf("The directory is: %s \n", file.Name())
+			continue
+		}
+		t.Logf("The file is: %s \n", file.Name())
 	}
 }
