@@ -3,7 +3,7 @@
   "case": "snake",
   "ai": {
     "provider": "openrouter",
-    "model": "deepseek/deepseek-chat-v3-0324",
+    "model": "google/gemini-2.0-flash-lite-001",
     "api_key": "",
     "max_tokens": 1000,
     "temperature": 0.7,
@@ -24,7 +24,7 @@
     "ai": {
       "workers": 5,
       "timeout": "30s",
-      "retries": 1
+      "retries": 3
     },
     "file": {
       "workers": 5,
