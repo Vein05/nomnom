@@ -103,10 +103,10 @@ git clone https://github.com/vein05/nomnom.git
 cd nomnom
 
 # Make it executable
-chmod +x nomnom
+chmod +x ./nomnom
 
 # Move binary to your PATH
-sudo mv nomnom /usr/local/bin/
+sudo mv ./nomnom /usr/local/bin/
 
 # Create config directory and copy default config(after adding your API Keys or making changes)
 mkdir -p ~/.config/nomnom
