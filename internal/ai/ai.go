@@ -153,30 +153,59 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		for range folder.FileList {
 			res := <-results
 			if res.err != nil {
-				fmt.Printf("[3/6] ❌ Failed to process file: %v\n", res.err)
+				fmt.Printf("[3/6] ❌ Failed to process file: %s. Error: %v\n", folder.FileList[res.index].Name, res.err)
+				folder.FileList[res.index].NewName = res.name
 				continue
 			}
 			folder.FileList[res.index].NewName = res.name
 		}
 
 		// if we have failed files, we retry them with a new worker
-		for retries > 0 {
+		// Retry handling with proper result collection
+		for retryAttempt := range retries {
+			fmt.Printf("[3/6] 🔄 Retry attempt %d/%d\n", retryAttempt+1, retries)
 			failedFiles := 0
+			failedIndices := []int{}
+
+			// First identify all failed files
 			for i, file := range folder.FileList {
-				if file.NewName == "" {
+				if file.NewName == "NOMNOMFAILED" {
 					failedFiles++
-					fmt.Printf("[3/6] 🔄 Retrying failed file: %s\n", file.Name)
-					sem <- struct{}{} // Acquire a worker slot for retry
-					go func(i int, file *contentprocessors.File) {
-						defer func() { <-sem }() // Release the worker slot when done
-						doAI(i, file, opts, query, client, results)
-					}(i, &file)
+					failedIndices = append(failedIndices, i)
 				}
 			}
+
 			if failedFiles == 0 {
+				fmt.Printf("[3/6] ✅ No more failed files to retry\n")
 				break
 			}
-			retries--
+
+			fmt.Printf("[3/6] 🔄 Retrying %d failed files\n", failedFiles)
+
+			// Create a new results channel specifically for this retry batch
+			retryResults := make(chan result, failedFiles)
+
+			// Process the failed files
+			for _, i := range failedIndices {
+				fileToRetry := folder.FileList[i] // Make a copy
+				fmt.Printf("[3/6] 🔄 Retrying failed file: %s\n", fileToRetry.Name)
+				sem <- struct{}{} // Acquire a worker slot for retry
+				go func(index int, file contentprocessors.File) {
+					defer func() { <-sem }() // Release the worker slot when done
+					doAI(index, &file, opts, query, client, retryResults)
+				}(i, fileToRetry)
+			}
+
+			// Collect results from this retry batch
+			for range failedIndices {
+				res := <-retryResults
+				if res.err != nil {
+					fmt.Printf("[3/6] ❌ Retry failed for file: %s. Error: %v\n", folder.FileList[res.index].Name, res.err)
+				} else {
+					fmt.Printf("[3/6] ✅ Retry succeeded for file: %s -> %s\n", folder.FileList[res.index].Name, res.name)
+				}
+				folder.FileList[res.index].NewName = res.name
+			}
 		}
 	}
 	// Wait for any remaining workers to finish
@@ -214,8 +243,17 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 		return
 	}
 
-	// Convert the response to the given case in the config
 	refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
+
+	// check if the response is valid
+	isValid, reason := fileutils.IsAValidFileName(refinedName)
+
+	if !isValid {
+		file.Context = "This is a retry for this file because it failed file validation last time for the reason: " + reason + "\n" + "Please check the file context and try again." + file.Context
+		results <- result{j, "NOMNOMFAILED", fmt.Errorf("invalid response from AI: %s", reason)}
+		return
+	}
+
 	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
 
 	// Remove new lines and spaces from the new name
