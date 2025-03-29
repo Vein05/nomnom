@@ -28,6 +28,7 @@ type FolderType struct {
 }
 
 type File struct {
+	UNCHANGEDPATH string `json:"unchanged_path,omitempty"`
 	Name          string `json:"name,omitempty"`
 	NewName       string `json:"new_name,omitempty"`
 	Path          string `json:"path,omitempty"`
@@ -243,6 +244,7 @@ func processFile(f os.DirEntry, dir string, results chan result) {
 
 	results <- result{
 		File: File{
+			UNCHANGEDPATH: filepath.Join(dir, f.Name()),
 			Name:          f.Name(),
 			Path:          filepath.Join(dir, f.Name()),
 			Size:          fileInfo.Size(),
