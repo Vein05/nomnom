@@ -20,6 +20,7 @@ type args struct {
 	dryRun      bool
 	log         bool
 	revert      string
+	organize    bool
 }
 
 var cmdArgs = &args{}
@@ -58,6 +59,7 @@ var rootCmd = &cobra.Command{
 			cmdArgs.autoApprove,
 			cmdArgs.dryRun,
 			cmdArgs.log,
+			cmdArgs.organize,
 		)
 		if err != nil {
 			fmt.Printf("Error creating query: %v\n", err)
@@ -144,6 +146,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&cmdArgs.dryRun, "dry-run", "n", true, "Preview changes without actually renaming files")
 	rootCmd.Flags().BoolVarP(&cmdArgs.log, "log", "l", true, "Enable logging to file")
 	rootCmd.Flags().StringVarP(&cmdArgs.revert, "revert_path", "r", "", "Path to the changes file to revert operations from")
+	rootCmd.Flags().BoolVarP(&cmdArgs.organize, "organize", "o", true, "Organize files into folders based on content")
 
 	// Add a PreRunE to validate flags
 	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
