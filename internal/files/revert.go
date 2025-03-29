@@ -104,7 +104,7 @@ func ProcessRevert(opts RevertOptions) error {
 
 			// Log successful revert operation
 			logger.LogOperationWithType(entry.NewPath, revertPath, utils.OperationRevert, true, nil)
-			fmt.Printf("Reverted: %s to %s, status: ✅ DONE", filepath.Base(entry.NewPath), filepath.Base(revertPath))
+			fmt.Printf("Reverted: %s to %s, status: ✅ DONE\n", filepath.Base(entry.NewPath), filepath.Base(revertPath))
 		}
 	}
 
