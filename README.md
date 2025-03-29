@@ -13,7 +13,8 @@
 ## Features ✨
 
 - 🗂️ **Bulk Processing**: Rename entire folders of files in one go
-- 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference (more parallel features coming soon)
+- 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference 
+- 📂 **Reorganize** : Automaticlaly reorganize the renamed files into category folders
 - 📄 **Smart Content Analysis**: Supports various file types including:
   - Text files
   - Documents (PDF, DOCX) - First 2 pages analyzed for context
@@ -168,14 +169,15 @@ nomnom --dir <directory> [flags]
 
 ### Available Flags
 
-| Flag           | Short | Description                                     |
-|---------------|--------|-------------------------------------------------|
-| --dir         | -d    | Source directory containing files to rename      |
-| --config      | -c    | Path to config file (default: ~/.config/nomnom/config.json)  |
-| --auto-approve| -y    | Automatically approve changes                    |
-| --dry-run     | -n    | Preview changes without renaming (default: true)                |
-| --log         | -l    | Enable operation logging (default: true)        |
-| --revert      | -r    | Revert changes from the log file               |
+| Flag           | Short | Description                                     | Default |
+|---------------|--------|------------------------------------------------|---------|
+| --dir         | -d    | Source directory containing files to rename      | |
+| --config      | -c    | Path to config file                             | ~/.config/nomnom/config.json |
+| --auto-approve| -y    | Automatically approve changes                    | false |
+| --dry-run     | -n    | Preview changes without renaming                | true |
+| --log         | -l    | Enable operation logging                        | true |
+| --organize    | -o    | Organize files into category folders            | true |
+| --revert      | -r    | Revert changes from the log file               | OFF |
 
 ### Configuration
 
@@ -238,6 +240,24 @@ OpenRouter gives you access to various models including:
 - `anthropic/claude-3-sonnet-20240229`
 - `openai/gpt-4-turbo-preview`
 - And many more! Check [OpenRouter's model list](https://openrouter.ai/docs#models) for all available options. I recommend using `google/gemini-2.0-flash-001`.
+
+### File Organization 📂
+
+NomNom can automatically organize files into categories based on their types:
+
+- **Default Categories**:
+  - Documents (pdf, docx, txt, etc.)
+  - Images (png, jpg, etc.)
+  - Audios (mp3, wav, etc.)
+  - Videos (mp4, mov, etc.)
+  - Others (uncategorized files)
+
+- **Features**:
+  - Automatic type detection
+  - Maintains original file structure within categories
+  - Safe file operations with duplicate handling
+  - Optional - can be disabled with `--organize=false`
+
 
 ### Logging and Reverting
 
