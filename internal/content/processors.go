@@ -2,7 +2,6 @@ package nomnom
 
 import (
 	"fmt"
-	"strconv"
 
 	utils "nomnom/internal/utils"
 	"os"
@@ -23,6 +22,7 @@ type Query struct {
 	Log         bool
 	Folders     []FolderType
 	Logger      *utils.Logger
+	Organize    bool
 }
 
 // ProcessResult represents the result of processing files
@@ -39,8 +39,36 @@ type SafeProcessor struct {
 	output string
 }
 
+type FileTypeCategory struct {
+	Name       string
+	Extensions []string
+}
+
+var defaultCategories = []FileTypeCategory{
+	{
+		Name:       "Images",
+		Extensions: []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"},
+	},
+	{
+		Name:       "Documents",
+		Extensions: []string{".pdf", ".doc", ".docx", ".txt", ".md", ".rtf"},
+	},
+	{
+		Name:       "Audios",
+		Extensions: []string{".mp3", ".wav", ".flac", ".m4a", ".aac"},
+	},
+	{
+		Name:       "Videos",
+		Extensions: []string{".mp4", ".mov", ".avi", ".mkv", ".wmv"},
+	},
+	{
+		Name:       "Others",
+		Extensions: []string{}, // Catch-all for unmatched types
+	},
+}
+
 // NewQuery creates a new Query object with the given parameters.
-func NewQuery(prompt string, dir string, configPath string, config utils.Config, autoApprove bool, dryRun bool, log bool) (*Query, error) {
+func NewQuery(prompt string, dir string, configPath string, config utils.Config, autoApprove bool, dryRun bool, log bool, organize bool) (*Query, error) {
 
 	if prompt == "" {
 		if config.AI.Prompt != "" {
@@ -72,6 +100,7 @@ func NewQuery(prompt string, dir string, configPath string, config utils.Config,
 		Prompt:      prompt,
 		Folders:     folders.Folders,
 		Logger:      logger,
+		Organize:    organize,
 	}, nil
 }
 
@@ -101,10 +130,18 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 
 	// First phase: Copy all files with original structure
 	if !p.query.DryRun {
-		fmt.Printf("[2/6] Starting file copy phase\n")
-		if err := p.copyOriginalStructure(); err != nil {
-			log.Printf("[2/6] ❌ Failed to copy original structure: %v", err)
-			return nil, fmt.Errorf("failed to copy original structure: %w", err)
+		if !p.query.Organize {
+			fmt.Printf("[2/6] Starting file copy phase in original structure.\n")
+			if err := p.copyOriginalStructure(); err != nil {
+				log.Printf("[2/6] ❌ Failed to copy original structure: %v", err)
+				return nil, fmt.Errorf("failed to copy original structure: %w", err)
+			}
+		} else {
+			fmt.Printf("[2/6] Starting file copy phase in Organized structure\n")
+			if err := p.copyOrganizedStructure(); err != nil {
+				log.Printf("[2/6] ❌ Failed to copy organized structure: %v", err)
+				return nil, fmt.Errorf("failed to copy organized structure: %w", err)
+			}
 		}
 		fmt.Printf("[2/6] Completed file copy phase\n")
 	}
@@ -112,83 +149,88 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	// Second phase: Process and rename files
 	fmt.Printf("[2/6] Starting file processing phase\n")
 	for _, folder := range p.query.Folders {
-		// Get the output folder path
-		outFolder := filepath.Join(p.output, folder.Name)
 		fmt.Printf("[2/6] Processing folder: %s, files: %d\n", folder.Name, len(folder.FileList))
 
-		// Process each file
 		counter := 0
 		for _, file := range folder.FileList {
-			fmt.Printf("[2/6] Processing file: %s, size: %s\n", file.Name, file.FormattedSize)
+			// Define all path structures at the start of the loop
+			category := getCategoryForFile(file.Name)
+			baseOutputPath := filepath.Join(p.output, folder.Name)
+
+			var (
+				currentPath string // Path of the copied file before rename
+				newPath     string // Destination path after rename
+			)
+
+			if p.query.Organize {
+				currentPath = filepath.Join(p.output, category, file.Name)
+				newPath = filepath.Join(p.output, category, file.NewName)
+			} else {
+				currentPath = filepath.Join(baseOutputPath, file.Name)
+				newPath = filepath.Join(baseOutputPath, file.NewName)
+			}
+
+			// Handle duplicate filenames
+			if _, err := os.Stat(newPath); err == nil {
+				newPath = utils.GenerateUniqueFilename(newPath, counter)
+				fmt.Printf("[2/6] Duplicate file detected, renaming to: %s\n", newPath)
+
+			}
+
+			fmt.Printf("[2/6] Processing file: %s\n", file.Name)
+			fmt.Printf("  - Current path: %s\n", currentPath)
+			fmt.Printf("  - New path: %s\n", newPath)
+
 			result := ProcessResult{
 				OriginalPath: file.Path,
+				NewPath:      newPath,
 				Success:      true,
 			}
 
-			// Current copied file path (before rename)
-			currentPath := filepath.Join(outFolder, file.Name)
+			// Skip if no new name was generated
+			if file.NewName == "" {
+				fmt.Printf("[2/6] No new name generated for: %s\n", file.Name)
+				results = append(results, result)
+				continue
+			}
 
-			// Generate new path
-			if file.NewName != "" {
-				result.NewPath = filepath.Join(outFolder, file.NewName)
-
-				// In non-dry-run mode, rename the copied file
-				if !p.query.DryRun {
-					// when auto approve is false, ask the user to approve the rename
-					if counter == 0 {
-						fmt.Printf("[2/6] Auto approve is: %t\n", p.query.AutoApprove)
-					}
-					if !p.query.AutoApprove {
-						prompt := promptui.Select{
-							Label: "Approve rename for " + file.Name + " to " + file.NewName,
-							Items: []string{"yes", "no", "approve all"},
-						}
-						_, result, err := prompt.Run()
-						if err != nil {
-							log.Printf("[2/6] ❌ Error running prompt: %v", err)
-						}
-						if result == "no" {
-							fmt.Printf("[2/6] Skipping rename for: %s to %s\n", file.Name, file.NewName)
-							continue
-						}
-						if result == "approve all" {
-							p.query.AutoApprove = true
-							fmt.Printf("[2/6] Auto approving all renames")
-						}
-					}
-					// before renaming, check if the file exists, if it exsits add for n to the end of the new name
-					if _, err := os.Stat(result.NewPath); err == nil {
-						result.NewPath = filepath.Join(outFolder, file.NewName+"_"+strconv.Itoa(counter))
-					}
-					if err := os.Rename(currentPath, result.NewPath); err != nil {
-						log.Printf("[2/6] ❌ Failed to rename file: %s to %s, error: %v", file.Name, file.NewName, err)
-						result.Success = false
-						result.Error = fmt.Errorf("failed to rename file: %w", err)
-					} else {
-						fmt.Printf("[2/6] Successfully renamed file: %s to %s\n", file.Name, file.NewName)
-					}
-				} else {
-					fmt.Printf("[2/6] Dry run: Would rename %s to %s\n", file.Name, file.NewName)
+			// In non-dry-run mode, rename the copied file
+			if !p.query.DryRun {
+				if !p.query.AutoApprove && counter == 0 {
+					fmt.Printf("[2/6] Auto approve is disabled\n")
 				}
 
-				// Log the operation if logging is enabled
-				if p.query.Logger != nil && !p.query.DryRun {
-					// Convert paths to absolute
-					absOrigPath, err := filepath.Abs(file.Path)
+				if !p.query.AutoApprove {
+					response, err := p.promptForRenameApproval(file.Name, file.NewName)
 					if err != nil {
-						log.Printf("[2/6] ❌ Could not get absolute path for: %s, error: %v", file.Path, err)
-						absOrigPath = file.Path
+						log.Printf("[2/6] ❌ Error running prompt: %v", err)
 					}
-					absNewPath, err := filepath.Abs(result.NewPath)
-					if err != nil {
-						log.Printf("[2/6] ❌ Could not get absolute path for: %s, error: %v", result.NewPath, err)
-						absNewPath = result.NewPath
+					if response == "no" {
+						fmt.Printf("[2/6] Skipping rename for: %s\n", file.Name)
+						continue
 					}
-					p.query.Logger.LogOperation(absOrigPath, absNewPath, result.Success, result.Error)
+					if response == "approve all" {
+						p.query.AutoApprove = true
+						fmt.Printf("[2/6] Auto approving all renames\n")
+					}
+				}
+
+				if err := os.Rename(currentPath, newPath); err != nil {
+					log.Printf("[2/6] ❌ Failed to rename file: %v", err)
+					result.Success = false
+					result.Error = fmt.Errorf("failed to rename file: %w", err)
+				} else {
+					fmt.Printf("[2/6] Successfully renamed file\n")
 				}
 			} else {
-				result.NewPath = currentPath
-				fmt.Printf("[2/6] No new name generated for: %s\n", file.Name)
+				fmt.Printf("[2/6] Dry run: Would rename %s to %s\n", file.Name, file.NewName)
+			}
+
+			// Log the operation if logging is enabled
+			if p.query.Logger != nil && !p.query.DryRun {
+				absOrigPath, _ := filepath.Abs(file.UNCHANGEDPATH)
+				absNewPath, _ := filepath.Abs(newPath)
+				p.query.Logger.LogOperation(absOrigPath, absNewPath, result.Success, result.Error)
 			}
 
 			results = append(results, result)
@@ -201,12 +243,58 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 		if err := p.query.Logger.Close(); err != nil {
 			log.Printf("[2/6] ❌ Failed to close logger: %v", err)
 		} else {
-			fmt.Printf("[2/6] Successfully closed logger")
+			fmt.Printf("[2/6] Successfully closed logger\n")
 		}
 	}
 
 	fmt.Printf("[2/6] Completed file processing phase\n")
 	return results, nil
+}
+
+// promptForRenameApproval handles the user prompt for rename approval
+func (p *SafeProcessor) promptForRenameApproval(oldName, newName string) (string, error) {
+	prompt := promptui.Select{
+		Label: fmt.Sprintf("Approve rename for %s to %s", oldName, newName),
+		Items: []string{"yes", "no", "approve all"},
+	}
+	_, result, err := prompt.Run()
+	return result, err
+}
+
+func getCategoryForFile(fileName string) string {
+	ext := filepath.Ext(fileName)
+	for _, category := range defaultCategories {
+		for _, categoryExt := range category.Extensions {
+			if categoryExt == ext {
+				return category.Name
+			}
+		}
+	}
+	return "Others"
+}
+
+func (p *SafeProcessor) copyOrganizedStructure() error {
+	// Create category folders
+	for _, category := range defaultCategories {
+		categoryPath := filepath.Join(p.output, category.Name)
+		if err := os.MkdirAll(categoryPath, 0755); err != nil {
+			return fmt.Errorf("failed to create category folder %s: %w", categoryPath, err)
+		}
+	}
+
+	// Copy files into appropriate category folders
+	for _, folder := range p.query.Folders {
+		for i, file := range folder.FileList {
+			category := getCategoryForFile(file.Name)
+			dstPath := filepath.Join(p.output, category, file.Name)
+			// query should be updated to reflect the new path
+			folder.FileList[i].Path = dstPath
+			if err := copyFile(file.Path, dstPath); err != nil {
+				return fmt.Errorf("failed to copy file %s: %w", file.Path, err)
+			}
+		}
+	}
+	return nil
 }
 
 // copyOriginalStructure copies the entire directory structure and files to the output directory
