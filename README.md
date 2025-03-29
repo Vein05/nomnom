@@ -9,6 +9,15 @@
 
 </div>
 
+## Images
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
+  <img src="./data/summary.png" alt="Summary Results">
+    <h2> Before </h2>
+    <img src="./data/before.png" alt="Before">
+    <h2> After </h2>
+    <img src="./data/after.png" alt="After">
+</div>
+
 
 ## Features ✨
 
@@ -97,8 +106,8 @@ Note: All the validation is done in `internal/files/validation.go`.
   export OPENROUTER_API_KEY="your-openrouter-api-key"
   ```
 
-NomNom will automatically detect and use these environment variables if no API keys are specified in the config file.
-
+**NomNom will automatically detect and use these environment variables if no API keys are specified(but the providers are) in the config file.** 
+If no provider is set, it will revert to deepseek and possibly use the `DEEPSEEK_API_KEY` env variable. 
 ## Installation
 
 ### Requirements
@@ -153,7 +162,7 @@ copy nomnom.exe $env:USERPROFILE\Tools\
 
 1. Create/Edit the config
 
-The configuration file is located or should be created at `~/.config/nomnom/config.json`. You can see the config example in `config.example.json`.
+1. Create/Edit the config file at `~/.config/nomnom/config.json`. See [config.example.json](config.example.json) for a complete example.
 
 2. Run NomNom:
 ```bash
@@ -207,7 +216,7 @@ NomNom uses a JSON configuration file with the following options:
   - Timeout settings
   - Retry configuration
 
-See the full configuration example in `config.example.json`.
+See the full configuration example in [config.example.json](config.example.json).
 
 ### AI Provider Examples
 
