@@ -377,12 +377,12 @@ nomnom -d "~/Documents/ResearchPapers/" -y -n=false
 </details>
 
 <details>
- <summary>Revert previous changes (Coming Soon)</summary>
+ <summary>Revert previous changes </summary>
 
 ```bash
-nomnom --revert
+nomnom --revert "demo/nomnom/logs/changes_1743284325.json"
 # or
-nomnom -r
+nomnom -r "demo/nomnom/logs/changes_1743284325.json"
 ```
 </details>
 
