@@ -47,54 +47,6 @@
   - Detailed error information and processing statistics
 - ↩️ **Revert Support**: Ability to undo rename operations using logged history
 
-### Parallel Processing 🔄
-
-NomNom uses parallel processing for both AI operations and file handling:
-
-- **Parallel AI Inference**: 
-  - Processes multiple files simultaneously through AI models
-  - Smart resource management for concurrent AI requests
-  - Configurable retry mechanisms for failed requests
-  - Automatic batch processing of files
-
-- **Parallel File Processing**:
-  - Concurrent file reading and content extraction
-  - Worker pool-based processing for efficient I/O operations
-  - Safe file operations with semaphore-based concurrency control
-  - Automatic file size validation and filtering
-
-- **Configurable Settings**:
-  ```json
-  {
-    "performance": {
-      "ai": {
-        "workers": 5,        // Number of concurrent AI workers
-        "timeout": "30s",    // AI operation timeout
-        "retries": 1        // Number of retries for failed AI requests
-      },
-      "file": {
-        "workers": 5,        // Number of concurrent file workers
-        "timeout": "30s",    // File operation timeout
-        "retries": 1        // Number of retries for failed file operations
-      }
-    }
-  }
-  ```
-
-
-> **Note**: The parallel processing system is designed to be efficient while preventing system overload. The number of workers and timeouts can be adjusted based on your system's capabilities and requirements.
-
-### File Name Validation
-
-NomNom includes comprehensive file name validation to ensure safe and compatible renaming:
-
-- Checks for invalid characters in file names
-- Validates against Windows reserved names
-- Enforces path length limits
-- Removes leading/trailing spaces and periods
-- Handles duplicate file names with incremental suffixes
-
-Note: All the validation is done in `internal/files/validation.go`.
 
 ### Things to know
 - You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
@@ -249,6 +201,56 @@ OpenRouter gives you access to various models including:
 - `anthropic/claude-3-sonnet-20240229`
 - `openai/gpt-4-turbo-preview`
 - And many more! Check [OpenRouter's model list](https://openrouter.ai/docs#models) for all available options. I recommend using `google/gemini-2.0-flash-001`.
+
+
+### Parallel Processing 🔄
+
+NomNom uses parallel processing for both AI operations and file handling:
+
+- **Parallel AI Inference**: 
+  - Processes multiple files simultaneously through AI models
+  - Smart resource management for concurrent AI requests
+  - Configurable retry mechanisms for failed requests
+  - Automatic batch processing of files
+
+- **Parallel File Processing**:
+  - Concurrent file reading and content extraction
+  - Worker pool-based processing for efficient I/O operations
+  - Safe file operations with semaphore-based concurrency control
+  - Automatic file size validation and filtering
+
+- **Configurable Settings**:
+  ```json
+  {
+    "performance": {
+      "ai": {
+        "workers": 5,        // Number of concurrent AI workers
+        "timeout": "30s",    // AI operation timeout
+        "retries": 1        // Number of retries for failed AI requests
+      },
+      "file": {
+        "workers": 5,        // Number of concurrent file workers
+        "timeout": "30s",    // File operation timeout
+        "retries": 1        // Number of retries for failed file operations
+      }
+    }
+  }
+  ```
+
+
+> **Note**: The parallel processing system is designed to be efficient while preventing system overload. The number of workers and timeouts can be adjusted based on your system's capabilities and requirements.
+
+### File Name Validation
+
+NomNom includes comprehensive file name validation to ensure safe and compatible renaming:
+
+- Checks for invalid characters in file names
+- Validates against Windows reserved names
+- Enforces path length limits
+- Removes leading/trailing spaces and periods
+- Handles duplicate file names with incremental suffixes
+
+Note: All the validation is done in `internal/files/validation.go`.
 
 ### File Organization 📂
 
