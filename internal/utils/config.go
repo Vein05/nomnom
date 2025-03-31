@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	log "log"
@@ -64,20 +65,21 @@ type LoggingConfig struct {
 }
 
 func LoadConfig(path string) Config {
-	// check if path is empty
+	// Check if path is empty and set default based on OS
 	if path == "" {
-		path = "./config.json"
-
-		// check the os type and set the path accordingly
 		if runtime.GOOS == "windows" {
-			// windows uses backslashes for paths and we set out config file in
-			path = "./config.json"
+			appData := os.Getenv("APPDATA")
+			if appData == "" {
+				log.Fatal("❌ Failed to locate APPDATA directory in Windows. Make sure the config file is set.")
+			}
+			path = filepath.Join(appData, "nomnom", "config.json")
 		} else {
+			// Linux/macOS default path
 			home, err := os.UserHomeDir()
 			if err != nil {
-				log.Fatalf("Failed to get user home directory: %v", err)
+				log.Fatalf("❌ Failed to get user home directory: %v", err)
 			}
-			path = home + "/.config/nomnom/config.json"
+			path = filepath.Join(home, ".config", "nomnom", "config.json")
 		}
 	}
 
