@@ -148,26 +148,6 @@ NomNom uses a JSON configuration file with the following options:
   - `output`: Output directory path
   - `case`: Naming case style (snake, camel, etc.)
 
-- **AI Settings**
-  - Provider selection (DeepSeek/Ollama/OpenRouter)
-  - Model configuration
-  - API keys
-
-- **File Handling**
-  - File type inclusion/exclusion
-  - Size limits
-  - Backup options
-
-- **Content Extraction**
-  - Text extraction settings
-  - Metadata processing
-  - Content length limits
-
-- **Performance**
-  - Worker count
-  - Timeout settings
-  - Retry configuration
-
 See the full configuration example in [config.example.json](config.example.json).
 
 ### AI Provider Examples
@@ -218,24 +198,6 @@ NomNom uses parallel processing for both AI operations and file handling:
   - Worker pool-based processing for efficient I/O operations
   - Safe file operations with semaphore-based concurrency control
   - Automatic file size validation and filtering
-
-- **Configurable Settings**:
-  ```json
-  {
-    "performance": {
-      "ai": {
-        "workers": 5,        // Number of concurrent AI workers
-        "timeout": "30s",    // AI operation timeout
-        "retries": 1        // Number of retries for failed AI requests
-      },
-      "file": {
-        "workers": 5,        // Number of concurrent file workers
-        "timeout": "30s",    // File operation timeout
-        "retries": 1        // Number of retries for failed file operations
-      }
-    }
-  }
-  ```
 
 
 > **Note**: The parallel processing system is designed to be efficient while preventing system overload. The number of workers and timeouts can be adjusted based on your system's capabilities and requirements.
@@ -388,13 +350,6 @@ nomnom -r "demo/nomnom/logs/changes_1743284325.json"
 ```
 </details>
 
-## Contributing 
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License 📄
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
 
 ### Content Extraction Settings
 - `extract_text`: Enable text extraction from files
@@ -432,3 +387,11 @@ The test suite covers:
 - Logging and revert functionality
 - Configuration handling
 - Error cases and edge conditions
+
+## Contributing 
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License 📄
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
