@@ -142,19 +142,19 @@ cp config.example.json ~/.config/nomnom/config.json
 git clone https://github.com/vein05/nomnom.git
 cd nomnom
 
-# Create the config directory in AppData\Roaming
-mkdir -p $env:APPDATA\nomnom
+# Create config directory in AppData\Roaming
+New-Item -ItemType Directory -Path "$env:APPDATA\nomnom" -Force
 
-# Edit and Copy the example config file
-copy config.example.json $env:APPDATA\nomnom\config.json
+# Copy the example config file
+Copy-Item -Path "config.example.json" -Destination "$env:APPDATA\nomnom\config.json"
 
-# Add the executable to PATH (Option 1 - User's AppData)
-copy nomnom.exe $env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\
+# Add nomnom.exe to PATH (Option 1: Use a custom tools directory)
+New-Item -ItemType Directory -Path "$env:USERPROFILE\Tools" -Force
+Copy-Item -Path "nomnom.exe" -Destination "$env:USERPROFILE\Tools"
+[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\Tools", "User")
 
-# Alternative (Option 2 - Create a custom tools directory)
-mkdir -p $env:USERPROFILE\Tools
-copy nomnom.exe $env:USERPROFILE\Tools\
-# Then add %USERPROFILE%\Tools to your PATH in Windows Environment Variables
+# Option 2: Use WindowsApps (requires admin rights)
+# Copy-Item -Path "nomnom.exe" -Destination "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps"
 
 ```
 
