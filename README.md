@@ -64,7 +64,14 @@ If no provider is set, it will revert to deepseek and possibly use the `DEEPSEEK
 
 ### Requirements
 Install Tesseract OCR:
-   - macOS: `brew install tesseract`
+   - macOS: 
+     ```bash
+     brew install tesseract
+
+     #if you recieve the leptonica/allheaders.h: No such file or directory: try this following
+     export LIBRARY_PATH="/opt/homebrew/lib"
+     export CPATH="/opt/homebrew/include"
+     ```
    - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
    - Windows: Download installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
 
@@ -87,12 +94,16 @@ mkdir -p ~/.config/nomnom
 cp config.example.json ~/.config/nomnom/config.json
 ```
 
+
 ### Windows
 
 ```
 # Clone the repository
 git clone https://github.com/vein05/nomnom.git
 cd nomnom
+
+# Build the binary for Windows (requires Go installed)
+go build -o nomnom.exe
 
 # Create config directory in AppData\Roaming
 New-Item -ItemType Directory -Path "$env:APPDATA\nomnom" -Force
