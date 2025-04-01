@@ -87,6 +87,9 @@ func LoadConfig(path string) Config {
 
 	file, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Fatalf("❌ Config file not found at %s. Please copy config.example.json to this location and modify it accordingly.", path)
+		}
 		log.Fatalf("❌ Failed to read config file: %v", err)
 	}
 
