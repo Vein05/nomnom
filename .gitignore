@@ -27,7 +27,6 @@ go.work.sum
 
 notes.md
 
-/internal/files/demo/
-
-/demo
-/demo/*
+internal/files/demo
+internal/content/demo
+demo/
