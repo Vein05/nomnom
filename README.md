@@ -11,22 +11,15 @@
 
 ## Demo
 <div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
-  <h2> With Dry Run </h2>
+  <p> With Dry Run </p>
 
-  <video width="70%" controls>
-    <source src="https://i.imgur.com/VzrAlIA.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <h2> Without Dry Run </h2>
-  <video width="70%" controls>
-    <source src="https://i.imgur.com/BXJZ1TO.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <h2> Organization </h2>
-  <video width="70%" controls>
-    <source src="https://i.imgur.com/RO7z5tG.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
+  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_1.gif?raw=true" alt="First">
+  <p> Without Dry Run </p>
+
+  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_2.gif?raw=true" alt="Second">
+  <p> Organization </p>
+  
+  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_3.gif?raw=true">
 </div>
 
 

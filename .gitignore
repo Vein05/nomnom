@@ -34,3 +34,4 @@ demo/
 
 // ignore all video files
 *.mp4
+*.gif
