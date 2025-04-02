@@ -9,13 +9,24 @@
 
 </div>
 
-## Images
+## Demo
 <div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
-  <img src="./data/summary.png" alt="Summary Results">
-    <h2> Before </h2>
-    <img src="./data/before.png" alt="Before">
-    <h2> After </h2>
-    <img src="./data/after.png" alt="After">
+  <h2> With Dry Run </h2>
+
+  <video width="70%" controls>
+    <source src="https://i.imgur.com/VzrAlIA.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <h2> Without Dry Run </h2>
+  <video width="70%" controls>
+    <source src="https://i.imgur.com/BXJZ1TO.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <h2> Organization </h2>
+  <video width="70%" controls>
+    <source src="https://i.imgur.com/RO7z5tG.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
 </div>
 
 
