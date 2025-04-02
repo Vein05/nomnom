@@ -68,7 +68,7 @@ Install Tesseract OCR:
      ```bash
      brew install tesseract
 
-     #if you recieve the leptonica/allheaders.h: No such file or directory: try this following
+     #if you receive the leptonica/allheaders.h: No such file or directory: try this following
      export LIBRARY_PATH="/opt/homebrew/lib"
      export CPATH="/opt/homebrew/include"
      ```
