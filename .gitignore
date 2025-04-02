@@ -31,3 +31,6 @@ internal/files/demo
 internal/content/demo
 demo/
 .nomnom/logs/
+
+// ignore all video files
+*.mp4
