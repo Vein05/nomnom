@@ -4,6 +4,7 @@ import (
 	utils "nomnom/internal/utils"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -210,77 +211,93 @@ func TestCopyOrganizedStructure(t *testing.T) {
 	inputDir := filepath.Join(tmpDir, "input")
 	outputDir := filepath.Join(tmpDir, "output")
 
-	// Create test file structure
+	// Create test folders and files
+	testFiles := map[string]struct {
+		content  []byte
+		category string
+	}{
+		"document.txt": {[]byte("text content"), "Documents"},
+		"image.jpg":    {[]byte("image data"), "Images"},
+		"music.mp3":    {[]byte("audio data"), "Audios"},
+		"video.mp4":    {[]byte("video data"), "Videos"},
+		"unknown.xyz":  {[]byte("unknown data"), "Others"},
+	}
+
+	// Create input folder and files
 	if err := os.MkdirAll(inputDir, 0755); err != nil {
 		t.Fatalf("Failed to create input dir: %v", err)
 	}
 
-	// Create test files of different types
-	testFiles := map[string][]byte{
-		"document.txt":  []byte("text content"),
-		"image.png":     []byte("mock image data"),
-		"document.pdf":  []byte("mock pdf data"),
-		"audio.mp3":     []byte("mock audio data"),
-		"document.docx": []byte("mock docx content"),
-	}
-
-	fileList := []File{}
-	for name, content := range testFiles {
+	// Create query with test files
+	var fileList []File
+	for name, data := range testFiles {
 		filePath := filepath.Join(inputDir, name)
-		if err := os.WriteFile(filePath, content, 0644); err != nil {
+		if err := os.WriteFile(filePath, data.content, 0644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", name, err)
 		}
 		fileList = append(fileList, File{
-			Name:    name,
-			NewName: name,
-			Path:    filePath,
+			Name: name,
+			Path: filePath,
 		})
 	}
 
-	// Create a Query with Organize flag set to true
 	query := &Query{
-		Dir:         inputDir,
-		DryRun:      false,
-		AutoApprove: true,
-		Organize:    true,
+		Dir:      inputDir,
+		Organize: true, // Enable organized mode
 		Folders: []FolderType{{
-			Name:     "input",
+			Name:     "test_folder",
 			FileList: fileList,
 		}},
 	}
 
-	// Create and process with SafeProcessor
+	// Create and run processor
 	processor := NewSafeProcessor(query, outputDir)
-	results, err := processor.Process()
-	if err != nil {
-		t.Errorf("Process() error = %v", err)
-		return
+	if err := processor.copyOrganizedStructure(); err != nil {
+		t.Fatalf("copyOrganizedStructure() error = %v", err)
 	}
 
-	// Verify results
-	if len(results) == 0 {
-		t.Error("Process() returned no results")
-		return
-	}
+	// Verify files were organized correctly
+	for fileName, data := range testFiles {
+		expectedPath := filepath.Join(outputDir, data.category, fileName)
 
-	// Verify files were organized into category folders
-	categoryFolders := map[string]int{
-		"Documents": 3, // expecting 3 documents (txt, pdf, docx)
-		"Images":    1, // expecting 1 image (png)
-		"Audios":    1, // expecting 1 audio (mp3)
-	}
-
-	for folder, expectedCount := range categoryFolders {
-		folderPath := filepath.Join(outputDir, folder)
-		files, err := os.ReadDir(folderPath)
+		// Check if file exists
+		content, err := os.ReadFile(expectedPath)
 		if err != nil {
-			t.Errorf("Failed to read category folder %s: %v", folder, err)
+			t.Errorf("Failed to read file %s: %v", expectedPath, err)
 			continue
 		}
 
-		if len(files) != expectedCount {
-			t.Errorf("Category %s has incorrect number of files. Got: %d, Want: %d",
-				folder, len(files), expectedCount)
+		// Verify content
+		if string(content) != string(data.content) {
+			t.Errorf("File content mismatch for %s. Got: %s, Want: %s",
+				expectedPath, string(content), string(data.content))
+		}
+	}
+
+	// Verify all category folders were created
+	for _, category := range defaultCategories {
+		categoryPath := filepath.Join(outputDir, category.Name)
+		if _, err := os.Stat(categoryPath); os.IsNotExist(err) {
+			t.Errorf("Expected category folder %s was not created", category.Name)
+		}
+	}
+
+	// Verify file categorization is correct
+	for fileName, data := range testFiles {
+		extension := filepath.Ext(fileName)
+		expectedCategory := "Others"
+
+		// Find the expected category based on file extension
+		for _, category := range defaultCategories {
+			if slices.Contains(category.Extensions, extension) {
+				expectedCategory = category.Name
+				break
+			}
+		}
+
+		if expectedCategory != data.category {
+			t.Errorf("File %s was categorized as %s, expected %s",
+				fileName, data.category, expectedCategory)
 		}
 	}
 }
