@@ -10,8 +10,6 @@ import (
 
 	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
-
-	log "log"
 )
 
 const (
@@ -22,9 +20,10 @@ const (
 )
 
 type FolderType struct {
-	Name       string `json:"name,omitempty"`
-	FileList   []File `json:"file_list,omitempty"`
-	FolderPath string `json:"folder_path,omitempty"`
+	Name       string       `json:"name,omitempty"`
+	FileList   []File       `json:"file_list,omitempty"`
+	FolderPath string       `json:"folder_path,omitempty"`
+	SubFolders []FolderType `json:"sub_folders,omitempty"`
 }
 
 type File struct {
@@ -124,82 +123,133 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 	fmt.Printf("[2/6] Nomnom: File processing is running with: %d workers, %s timeout, %d retries\n", workers, timeout, retries)
 
 	var query Query
-	var wg sync.WaitGroup
 
-	// create a new FolderType object
-	folder := FolderType{
-		Name:       filepath.Base(dir),
-		FolderPath: dir,
-		FileList:   []File{},
-	}
+	// create a recursive function to process directories
 
-	// read the directory
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		log.Printf("❌ Failed to read directory %s: %v", dir, err)
-		return Query{}, fmt.Errorf("error reading directory %s: %w", dir, err)
-	}
+	var fileWg sync.WaitGroup
+	var mu sync.Mutex
 
-	fmt.Printf("[2/6] Found %d items in directory: %s\n", len(files), dir)
+	var processDirectory func(path string) (*FolderType, error)
+	processDirectory = func(path string) (*FolderType, error) {
+		var localWg sync.WaitGroup
 
-	// Create buffered channels for results and semaphore for worker limiting
-	results := make(chan result, len(files))
-	sem := make(chan struct{}, workers) // Semaphore to limit concurrent operations
-	var validFiles []os.DirEntry
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read directory %s: %w", path, err)
+		}
+		folder := &FolderType{
+			Name:       filepath.Base(path),
+			FolderPath: path,
+			FileList:   []File{},
+			SubFolders: []FolderType{},
+		}
 
-	// First pass to check file sizes and collect valid files
-	for _, f := range files {
-		if !f.IsDir() {
-			fileInfo, err := os.Stat(filepath.Join(dir, f.Name()))
-			if err != nil {
-				log.Printf("❌ Failed to get file info for: %s, error: %v", f.Name(), err)
-				continue
-			}
+		var dirCount int
+		var fileCount int
 
-			if config.FileHandling.MaxSize != "" {
-				maxSize, err := convertSize(config.FileHandling.MaxSize)
+		// Create buffered channels for results and semaphore for worker limiting
+		results := make(chan result, len(entries))
+		sem := make(chan struct{}, workers) // Semaphore to limit concurrent operations
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				folderInfo, err := entry.Info()
 				if err != nil {
-					log.Printf("❌ Failed to parse max size: %v", err)
+					fmt.Printf("❌ Failed to get folder info for: %s, error: %v", entry.Name(), err)
 					continue
 				}
-				if fileInfo.Size() > maxSize {
-					fmt.Printf("File: %s, size: %d, is too large to process\n", f.Name(), fileInfo.Size())
+				folderRelativePath := filepath.Join(folder.FolderPath, folderInfo.Name())
+				localWg.Add(1)
+				dirCount++
+				go func(path string) {
+					defer localWg.Done()
+					subFolder, err := processDirectory(path)
+					if err != nil {
+						fmt.Printf("❌ Failed to process subdirectory: %s, error: %v", path, err)
+						return
+					}
+					// Use a mutex to safely append to SubFolders
+					mu.Lock()
+					folder.SubFolders = append(folder.SubFolders, *subFolder)
+					mu.Unlock()
+				}(folderRelativePath)
+
+			} else {
+				fileInfoPath := filepath.Join(path, entry.Name())
+				fileInfo, err := os.Stat(fileInfoPath)
+				if err != nil {
+					fmt.Printf("❌ Failed to get file info for: %s, error: %v", entry.Name(), err)
 					continue
 				}
+
+				// Skip system and hidden files
+				if strings.HasPrefix(fileInfo.Name(), ".") ||
+					strings.HasSuffix(fileInfo.Name(), "~") ||
+					strings.HasSuffix(fileInfo.Name(), ".tmp") ||
+					strings.HasSuffix(fileInfo.Name(), ".swp") {
+					continue
+				}
+
+				if config.FileHandling.MaxSize != "" {
+					maxSize, err := convertSize(config.FileHandling.MaxSize)
+					if err != nil {
+						fmt.Printf("❌ Failed to parse max size: %v", err)
+						continue
+					}
+					if fileInfo.Size() > maxSize {
+						fmt.Printf("File: %s, size: %d, is too large to process\n", entry.Name(), fileInfo.Size())
+						continue
+					}
+				}
+
+				fileCount++
+				fileWg.Add(1)
+				go func(f os.DirEntry) {
+					defer fileWg.Done()
+					sem <- struct{}{} // Acquire semaphore
+					defer func() {
+						<-sem // Release semaphore when done
+					}()
+					processFile(f, path, results)
+				}(entry)
+
 			}
-			validFiles = append(validFiles, f)
-		}
-		if f.IsDir() {
-			fmt.Printf("[2/6] Skipping sub-directory: %q\n", f.Name())
-		}
-	}
 
-	// Launch goroutines for all valid files with worker limiting
-	for _, f := range validFiles {
-		wg.Add(1)
-		go func(f os.DirEntry) {
-			defer wg.Done()
-			sem <- struct{}{} // Acquire semaphore
-			defer func() {
-				<-sem // Release semaphore when done
+		}
+		if fileCount > 0 {
+			go func() {
+				fileWg.Wait()
+				localWg.Wait()
+				// Wait for all goroutines to finish
+				// Close the results channel after all goroutines are done
+				close(results)
+
 			}()
-			processFile(f, dir, results)
-		}(f)
-	}
 
-	// wait for all the files to be processed
-	wg.Wait()
-
-	// Collect results
-	for range validFiles {
-		result := <-results
-		if result.Err != nil {
-			continue
+			// Collect results
+			for result := range results {
+				if result.Err != nil {
+					continue
+				}
+				folder.FileList = append(folder.FileList, result.File)
+			}
+		} else {
+			// If no files were processed, close the results channel
+			close(results)
 		}
-		folder.FileList = append(folder.FileList, result.File)
+
+		localWg.Wait() // Wait for all subdirectory processing to finish
+
+		return folder, nil // maybe append to a list of folders or somehting like that?
 	}
 
-	query.Folders = append(query.Folders, folder)
+	// start processing the files
+	rootFolder, err := processDirectory(dir)
+	if err != nil {
+		return Query{}, fmt.Errorf("failed to process directory %s: %w", dir, err)
+	}
+
+	query.Folders = append(query.Folders, *rootFolder)
 	fmt.Printf("[2/6] Successfully processed directory: %s\n", dir)
 	return query, nil
 }
@@ -207,7 +257,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 func readFiles(file string, results chan result) {
 	fileContent, err := fileutils.ReadFile(file)
 	if err != nil {
-		log.Printf("❌ Failed to read file: %s, error: %v", file, err)
+		fmt.Printf("❌ Failed to read file: %s, error: %v", file, err)
 		results <- result{
 			File: File{},
 			Err:  err,
@@ -230,7 +280,7 @@ func processFile(f os.DirEntry, dir string, results chan result) {
 	fileResult := <-resultChan
 
 	if fileResult.Err != nil {
-		log.Printf("❌ Failed to read file: %s, error: %v", f.Name(), fileResult.Err)
+		fmt.Printf("❌ Failed to read file: %s, error: %v", f.Name(), fileResult.Err)
 		results <- result{Err: fileResult.Err}
 		return
 	}
