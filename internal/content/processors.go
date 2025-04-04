@@ -9,6 +9,8 @@ import (
 
 	log "log"
 
+	"slices"
+
 	"github.com/manifoldco/promptui"
 )
 
@@ -148,24 +150,22 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 
 	// Second phase: Process and rename files
 	fmt.Printf("[2/6] Starting file processing phase\n")
-	for _, folder := range p.query.Folders {
-		fmt.Printf("[2/6] Processing folder: %s, files: %d\n", folder.Name, len(folder.FileList))
 
+	var processFolder func(folder FolderType, relativePath string) error
+	processFolder = func(folder FolderType, relativePath string) error {
+		fmt.Printf("[2/6] Processing folder: %s, files: %d\n", folder.Name, len(folder.FileList))
 		counter := 0
 		for _, file := range folder.FileList {
-			// Define all path structures at the start of the loop
-			category := getCategoryForFile(file.Name)
-			baseOutputPath := filepath.Join(p.output, folder.Name)
-
 			var (
 				currentPath string // Path of the copied file before rename
 				newPath     string // Destination path after rename
 			)
 
 			if p.query.Organize {
-				currentPath = filepath.Join(p.output, category, file.Name)
-				newPath = filepath.Join(p.output, category, file.NewName)
+				currentPath = file.Path
+				newPath = filepath.Join(filepath.Dir(currentPath), file.NewName)
 			} else {
+				baseOutputPath := filepath.Join(p.output, folder.FolderPath)
 				currentPath = filepath.Join(baseOutputPath, file.Name)
 				newPath = filepath.Join(baseOutputPath, file.NewName)
 			}
@@ -178,8 +178,6 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 			}
 
 			fmt.Printf("[2/6] Processing file: %s\n", file.Name)
-			fmt.Printf("  - Current path: %s\n", currentPath)
-			fmt.Printf("  - New path: %s\n", newPath)
 
 			result := ProcessResult{
 				OriginalPath: file.Path,
@@ -222,8 +220,6 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 				} else {
 					fmt.Printf("[2/6] Successfully renamed file\n")
 				}
-			} else {
-				fmt.Printf("[2/6] Dry run: Would rename %s to %s\n", file.Name, file.NewName)
 			}
 
 			// Log the operation if logging is enabled
@@ -235,6 +231,21 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 
 			results = append(results, result)
 			counter++
+		}
+		// Process subfolders recursively
+		for _, subFolder := range folder.SubFolders {
+			newRelPath := filepath.Join(relativePath, subFolder.Name)
+			if err := processFolder(subFolder, newRelPath); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	// Start processing from root folders
+	for _, folder := range p.query.Folders {
+		if err := processFolder(folder, folder.Name); err != nil {
+			log.Printf("[2/6] ❌ Failed to process folder: %s, error: %v", folder.Name, err)
+			return nil, fmt.Errorf("failed to process folder %s: %w", folder.Name, err)
 		}
 	}
 
@@ -264,17 +275,14 @@ func (p *SafeProcessor) promptForRenameApproval(oldName, newName string) (string
 func getCategoryForFile(fileName string) string {
 	ext := filepath.Ext(fileName)
 	for _, category := range defaultCategories {
-		for _, categoryExt := range category.Extensions {
-			if categoryExt == ext {
-				return category.Name
-			}
+		if slices.Contains(category.Extensions, ext) {
+			return category.Name
 		}
 	}
 	return "Others"
 }
-
 func (p *SafeProcessor) copyOrganizedStructure() error {
-	// Create category folders
+	// Create category folders only at root level
 	for _, category := range defaultCategories {
 		categoryPath := filepath.Join(p.output, category.Name)
 		if err := os.MkdirAll(categoryPath, 0755); err != nil {
@@ -282,26 +290,54 @@ func (p *SafeProcessor) copyOrganizedStructure() error {
 		}
 	}
 
-	// Copy files into appropriate category folders
-	for _, folder := range p.query.Folders {
-		for i, file := range folder.FileList {
+	// Process all folders recursively
+	var processOrganizedFolder func(folder FolderType, relativePath string) error
+	processOrganizedFolder = func(folder FolderType, relativePath string) error {
+		for i := range folder.FileList {
+			file := &folder.FileList[i]
 			category := getCategoryForFile(file.Name)
-			dstPath := filepath.Join(p.output, category, file.Name)
-			// query should be updated to reflect the new path
-			folder.FileList[i].Path = dstPath
+
+			relativeFilePath := filepath.Join(relativePath, file.Name)
+			dstPath := filepath.Join(p.output, category, relativeFilePath)
+
+			// Ensure subdirectory exists within category
+			if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+				return fmt.Errorf("failed to create subdirectory: %w", err)
+			}
+
 			if err := copyFile(file.Path, dstPath); err != nil {
 				return fmt.Errorf("failed to copy file %s: %w", file.Path, err)
 			}
+
+			// update the file path in the original folder
+			file.Path = dstPath
+		}
+
+		// Process subfolders
+		for _, subFolder := range folder.SubFolders {
+			newRelPath := filepath.Join(relativePath, subFolder.Name)
+			if err := processOrganizedFolder(subFolder, newRelPath); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Start processing from root folders
+	for _, folder := range p.query.Folders {
+		if err := processOrganizedFolder(folder, ""); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// copyOriginalStructure copies the entire directory structure and files to the output directory
 func (p *SafeProcessor) copyOriginalStructure() error {
-	for _, folder := range p.query.Folders {
-		// Create corresponding folder in output directory
-		outFolder := filepath.Join(p.output, folder.Name)
+	// Process all folders recursively
+	var processOriginalFolder func(folder FolderType, relativePath string) error
+	processOriginalFolder = func(folder FolderType, relativePath string) error {
+		// Create folder in output directory
+		outFolder := filepath.Join(p.output, relativePath)
 		if err := os.MkdirAll(outFolder, 0755); err != nil {
 			log.Printf("[2/6] ❌ Failed to create output folder: %s, error: %v", outFolder, err)
 			return fmt.Errorf("failed to create output folder %s: %w", outFolder, err)
@@ -309,13 +345,30 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 		fmt.Printf("[2/6] Created output folder: %s\n", outFolder)
 
 		// Copy each file with original name
-		for _, file := range folder.FileList {
+		for i := range folder.FileList {
+			file := &folder.FileList[i]
 			dstPath := filepath.Join(outFolder, file.Name)
 			if err := copyFile(file.Path, dstPath); err != nil {
 				log.Printf("[2/6] ❌ Failed to copy file: %s to %s, error: %v", file.Path, dstPath, err)
 				return fmt.Errorf("failed to copy file %s: %w", file.Path, err)
 			}
-			fmt.Printf("[2/6] Copied file: %s to %s\n", file.Path, dstPath)
+			file.Path = dstPath
+		}
+
+		// Process subfolders recursively
+		for _, subFolder := range folder.SubFolders {
+			newRelPath := filepath.Join(relativePath, subFolder.Name)
+			if err := processOriginalFolder(subFolder, newRelPath); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Start processing from root folders
+	for _, folder := range p.query.Folders {
+		if err := processOriginalFolder(folder, folder.FolderPath); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -323,7 +376,6 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 
 // copyFile copies a file from src to dst
 func copyFile(src, dst string) error {
-	fmt.Printf("[2/6] Copying file from: %s to %s\n", src, dst)
 	input, err := os.ReadFile(src)
 	if err != nil {
 		log.Printf("[2/6] ❌ Failed to read source file: %s, error: %v", src, err)
@@ -334,7 +386,5 @@ func copyFile(src, dst string) error {
 		log.Printf("[2/6] ❌ Failed to write destination file: %s, error: %v", dst, err)
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
-
-	fmt.Printf("[2/6] Successfully copied file from: %s to %s\n", src, dst)
 	return nil
 }
