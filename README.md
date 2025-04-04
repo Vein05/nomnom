@@ -25,7 +25,7 @@
 
 ## Features ✨
 
-- 🗂️ **Bulk Processing**: Rename entire folders of files in one go
+- 🗂️ **Bulk Processing**: Rename entire folders(and their sub folders) of files in one go
 - 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference 
 - 📂 **Reorganize** : Automaticlaly reorganize the renamed files into category folders
 - 📄 **Smart Content Analysis**: Supports various file types including:
