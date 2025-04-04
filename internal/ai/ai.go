@@ -4,6 +4,7 @@ package nomnom
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	contentprocessors "nomnom/internal/content"
@@ -128,90 +129,97 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 
 	client.Timeout = parsedTimeout
 
-	// Create a semaphore channel to limit concurrent workers
-	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-	// Iterate through the folders
-	for i := range query.Folders {
-		folder := &query.Folders[i]
-		fmt.Printf("[3/6] 📁 Processing folder: %s\n", folder.Name)
-
-		// we create a channel to collect results and errors
+	// Create a recursive function to process folders
+	var processFolder func(folder *contentprocessors.FolderType) error
+	processFolder = func(folder *contentprocessors.FolderType) error {
+		// Create channels for the current folder's processing
+		sem := make(chan struct{}, workers)
 		results := make(chan result, len(folder.FileList))
 
-		// Process files concurrently with worker limit
+		// Process files in current folder
 		for j := range folder.FileList {
-			// Acquire a worker slot
-			sem <- struct{}{}
+			sem <- struct{}{} // Acquire worker slot
+			wg.Add(1)
 			go func(j int, file *contentprocessors.File) {
-				defer func() { <-sem }() // Release the worker slot when done
+				defer wg.Done()
+				defer func() { <-sem }() // Release worker slot
 				doAI(j, file, opts, query, client, results)
 			}(j, &folder.FileList[j])
 		}
 
-		// Collect results
-		for range folder.FileList {
+		// Collect results for current folder's files
+		for i := 0; i < len(folder.FileList); i++ {
 			res := <-results
 			if res.err != nil {
-				fmt.Printf("[3/6] ❌ Failed to process file: %s. Error: %v\n", folder.FileList[res.index].Name, res.err)
+				fmt.Printf("[3/6] ❌ Failed to process file: %s. Error: %v\n",
+					folder.FileList[res.index].Name, res.err)
 				folder.FileList[res.index].NewName = res.name
 				continue
 			}
 			folder.FileList[res.index].NewName = res.name
 		}
 
-		// if we have failed files, we retry them with a new worker
-		// Retry handling with proper result collection
-		for retryAttempt := range retries {
-			fmt.Printf("[3/6] 🔄 Retry attempt %d/%d\n", retryAttempt+1, retries)
-			failedFiles := 0
+		// Handle retries for failed files in current folder
+		for retryAttempt := 0; retryAttempt < retries; retryAttempt++ {
 			failedIndices := []int{}
 
-			// First identify all failed files
+			// Identify failed files
 			for i, file := range folder.FileList {
 				if file.NewName == "NOMNOMFAILED" {
-					failedFiles++
 					failedIndices = append(failedIndices, i)
 				}
 			}
 
-			if failedFiles == 0 {
-				fmt.Printf("[3/6] ✅ No more failed files to retry\n")
+			if len(failedIndices) == 0 {
 				break
 			}
 
-			fmt.Printf("[3/6] 🔄 Retrying %d failed files\n", failedFiles)
+			fmt.Printf("[3/6] 🔄 Retry attempt %d/%d for %d files\n",
+				retryAttempt+1, retries, len(failedIndices))
 
-			// Create a new results channel specifically for this retry batch
-			retryResults := make(chan result, failedFiles)
+			retryResults := make(chan result, len(failedIndices))
 
-			// Process the failed files
+			// Process failed files
 			for _, i := range failedIndices {
-				fileToRetry := folder.FileList[i] // Make a copy
-				fmt.Printf("[3/6] 🔄 Retrying failed file: %s\n", fileToRetry.Name)
-				sem <- struct{}{} // Acquire a worker slot for retry
-				go func(index int, file contentprocessors.File) {
-					defer func() { <-sem }() // Release the worker slot when done
-					doAI(index, &file, opts, query, client, retryResults)
-				}(i, fileToRetry)
+				sem <- struct{}{}
+				wg.Add(1)
+				go func(index int, file *contentprocessors.File) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					doAI(index, file, opts, query, client, retryResults)
+				}(i, &folder.FileList[i])
 			}
 
-			// Collect results from this retry batch
+			// Collect retry results
 			for range failedIndices {
 				res := <-retryResults
-				if res.err != nil {
-					fmt.Printf("[3/6] ❌ Retry failed for file: %s. Error: %v\n", folder.FileList[res.index].Name, res.err)
-				} else {
-					fmt.Printf("[3/6] ✅ Retry succeeded for file: %s -> %s\n", folder.FileList[res.index].Name, res.name)
-				}
+				mu.Lock()
 				folder.FileList[res.index].NewName = res.name
+				mu.Unlock()
 			}
 		}
+
+		// Process subfolders recursively
+		for i := range folder.SubFolders {
+			if err := processFolder(&folder.SubFolders[i]); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
-	// Wait for any remaining workers to finish
-	for range workers {
-		sem <- struct{}{}
+
+	// Process all root folders
+	for i := range query.Folders {
+		if err := processFolder(&query.Folders[i]); err != nil {
+			return err
+		}
 	}
+
+	wg.Wait()
 	return nil
 }
 
