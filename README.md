@@ -26,13 +26,14 @@
 ## Features ✨
 
 - 🗂️ **Bulk Processing**: Rename entire folders(and their sub folders) of files in one go
+- 🔧 **Configurable Prompts**: Customize AI prompts to match YOUR specific naming needs and preferences
 - 🚀 **Parallel Processing**: Process multiple files simultaneously using parallel AI inference 
 - 📂 **Reorganize** : Automaticlaly reorganize the renamed files into category folders
 - 📄 **Smart Content Analysis**: Supports various file types including:
   - Text files
   - Documents (PDF, DOCX) - First 2 pages analyzed for context
   - Presentations
-  - Images (metadata and OCR text extraction)
+  - Images (metadata and OCR text extraction)[Vison Support coming soon!]
   - Videos (metadata)
 - 🤖 **AI-Powered**: Multiple AI provider options:
   - DeepSeek V3/R1 model
@@ -153,6 +154,7 @@ nomnom --dir <directory> [flags]
 | --dry-run     | -n    | Preview changes without renaming                | true |
 | --log         | -l    | Enable operation logging                        | true |
 | --organize    | -o    | Organize files into category folders            | true |
+| --prompt      | -p    | Add a prompt type from the available options               | empty |
 | --revert      | -r    | Revert changes from the log file               | OFF |
 
 ### Configuration
@@ -246,6 +248,17 @@ NomNom can automatically organize files into categories based on their types:
   - Safe file operations with duplicate handling
   - Optional - can be disabled with `--organize=false`
 
+### Prompting
+You can easily change the prompts given to the AI through the config file. The config file is located at `~/.config/nomnom/config.json`. Do not set the prompt flag if you plan to use prompting from the config file. 
+
+OR 
+
+You can also use some prompts that come in default with nomnom using the prompt flag (-p). They include:
+
+1. Research papers (`-p=research`)
+2. Images (`-p=images`)
+
+These prompts are located in the [data directory](data/prompts)
 
 ### Logging and Reverting
 
@@ -360,6 +373,16 @@ nomnom -d "~/Documents/ResearchPapers/" -y -n=false
 
 ```bash
 nomnom --revert "demo/nomnom/logs/changes_1743284325.json"
+# or
+nomnom -r "demo/nomnom/logs/changes_1743284325.json"
+```
+</details>
+
+<details>
+ <summary>Using a different prompt </summary>
+
+```bash
+nomnom "-d "~/Documents/ResearchPapers/" -p research"
 # or
 nomnom -r "demo/nomnom/logs/changes_1743284325.json"
 ```
