@@ -1,29 +1,44 @@
 package nomnom
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
 
-func GenerateUniqueFilename(s string, counter int) string {
-	// Split the filename into name and extension
+func GenerateUniqueFilename(s string) string {
 	parts := strings.Split(s, ".")
-	if len(parts) < 2 {
-		// Handle files without extension
-		return s + "_" + strconv.Itoa(counter)
-	}
+	baseName := parts[0]
 
-	name := parts[0]
-	ext := parts[len(parts)-1]
+	// Regular expression to match the pattern and capture the number if it exists
+	re := regexp.MustCompile(`^(.*?)(?:\((\d+)\))?$`)
 
-	// Check if filename already has a counter
-	if strings.Contains(name, "_") {
-		nameParts := strings.Split(name, "_")
-		// Only split if the last part is numeric
-		if _, err := strconv.Atoi(nameParts[len(nameParts)-1]); err == nil {
-			name = strings.Join(nameParts[:len(nameParts)-1], "_")
+	// Function to handle the counting logic
+	getNextCount := func(matches []string) int {
+		if len(matches) < 3 || matches[2] == "" {
+			return 1
 		}
+		count, _ := strconv.Atoi(matches[2])
+		return count + 1
 	}
 
-	return name + "_" + strconv.Itoa(counter) + "." + ext
+	// If no extension
+	if len(parts) < 2 {
+		matches := re.FindStringSubmatch(baseName)
+		counter := getNextCount(matches)
+		if len(matches) > 1 {
+			baseName = matches[1]
+		}
+		return baseName + "(" + strconv.Itoa(counter) + ")"
+	}
+
+	// With extension
+	ext := parts[len(parts)-1]
+	matches := re.FindStringSubmatch(baseName)
+	counter := getNextCount(matches)
+	if len(matches) > 1 {
+		baseName = matches[1]
+	}
+
+	return baseName + "(" + strconv.Itoa(counter) + ")." + ext
 }
