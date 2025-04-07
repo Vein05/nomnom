@@ -28,9 +28,8 @@
   - [File Organization 📂](#file-organization-)
   - [Prompting](#prompting)
   - [Logging and Reverting](#logging-and-reverting)
-- [Commands](#commands)
-- [Content Extraction Settings](#content-extraction-settings)
-- [Performance](#performance)
+- [Examples](#commands)
+- [Testing](#testing)
 
 
 ## Demo
@@ -421,7 +420,7 @@ nomnom -r "demo/nomnom/logs/changes_1743284325.json"
 - `skip_large_files`: Skip processing of files larger than the specified size limit
 - `read_context`: Enable reading file context for better naming
 
-### Performance
+### Testing
 
 NomNom includes comprehensive tests for all major components. To run the tests:
 
