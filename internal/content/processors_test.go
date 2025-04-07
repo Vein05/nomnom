@@ -310,13 +310,13 @@ func TestCopyOrganizedStructure(t *testing.T) {
 
 func TestHandelPrompt(t *testing.T) {
 	DEFAULT_PROMPT := "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
-	file, err := os.ReadFile("../../data/prompts/images.txt")
+	file, err := os.ReadFile(NomNomPrompts[1].TestPath)
 	if err != nil {
 		t.Fatalf("Failed to read image prompt file: %v", err)
 	}
 	IMAGE_PROMPT := string(file)
 
-	file, err = os.ReadFile("../../data/prompts/research.txt")
+	file, err = os.ReadFile(NomNomPrompts[0].TestPath)
 	if err != nil {
 		t.Fatalf("Failed to read research prompt file: %v", err)
 	}
