@@ -2,6 +2,7 @@ package nomnom
 
 import (
 	"fmt"
+	"strings"
 
 	utils "nomnom/internal/utils"
 	"os"
@@ -69,17 +70,25 @@ var defaultCategories = []FileTypeCategory{
 	},
 }
 
+type Prompts struct {
+	Name string
+	Path string
+}
+
+var NomNomPrompts []Prompts = []Prompts{
+	{
+		Name: "research",
+		Path: "../../data/prompts/research.txt",
+	},
+	{
+		Name: "images",
+		Path: "../../data/prompts/images.txt",
+	}}
+
 // NewQuery creates a new Query object with the given parameters.
 func NewQuery(prompt string, dir string, configPath string, config utils.Config, autoApprove bool, dryRun bool, log bool, organize bool) (*Query, error) {
 
-	if prompt == "" {
-		if config.AI.Prompt != "" {
-			prompt = config.AI.Prompt
-		} else {
-			prompt = "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
-		}
-	}
-
+	prompt = handelPrompt(strings.ToLower(prompt), config)
 	folders, err := ProcessDirectory(dir, config)
 	if err != nil {
 		return nil, fmt.Errorf("error processing directory: %w", err)
@@ -387,4 +396,35 @@ func copyFile(src, dst string) error {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 	return nil
+}
+
+func handelPrompt(prompt string, config utils.Config) string {
+	DEFAULT_PROMPT := "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
+
+	if prompt == "" {
+		if config.AI.Prompt != "" {
+			prompt = config.AI.Prompt
+			return prompt
+		} else {
+			prompt = DEFAULT_PROMPT
+			return prompt
+		}
+	} else if prompt == "research" {
+		t, err := os.ReadFile(NomNomPrompts[0].Path)
+		if err != nil {
+			log.Printf("[2/6] ❌ Failed to read research prompt: %v", err)
+			return DEFAULT_PROMPT
+		}
+		prompt = string(t)
+		return prompt
+	} else if prompt == "images" {
+		t, err := os.ReadFile(NomNomPrompts[1].Path)
+		if err != nil {
+			log.Printf("[2/6] ❌ Failed to read images prompt: %v", err)
+			return DEFAULT_PROMPT
+		}
+		prompt = string(t)
+		return prompt
+	}
+	return DEFAULT_PROMPT
 }
