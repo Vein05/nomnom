@@ -47,12 +47,18 @@ func TestNewQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.config, tt.autoApprove, tt.dryRun, tt.log, false)
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && query == nil {
 				t.Error("NewQuery() returned nil query without error")
+			}
+
+			// check if prompt is set or not
+			if tt.prompt != "" && query.Prompt != tt.prompt {
+				t.Errorf("NewQuery() prompt = %v, want %v", query.Prompt, tt.prompt)
 			}
 		})
 	}
@@ -299,5 +305,71 @@ func TestCopyOrganizedStructure(t *testing.T) {
 			t.Errorf("File %s was categorized as %s, expected %s",
 				fileName, data.category, expectedCategory)
 		}
+	}
+}
+
+func TestHandelPrompt(t *testing.T) {
+	DEFAULT_PROMPT := "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
+	file, err := os.ReadFile("../../data/prompts/images.txt")
+	if err != nil {
+		t.Fatalf("Failed to read image prompt file: %v", err)
+	}
+	IMAGE_PROMPT := string(file)
+
+	file, err = os.ReadFile("../../data/prompts/research.txt")
+	if err != nil {
+		t.Fatalf("Failed to read research prompt file: %v", err)
+	}
+	RESEARCH_PROMPT := string(file)
+	tests := []struct {
+		name        string
+		prompt      string
+		config      utils.Config
+		expected    string
+		expectedErr bool
+	}{
+		{
+			name:        "Test Empty prompt",
+			prompt:      "",
+			config:      utils.Config{},
+			expected:    DEFAULT_PROMPT,
+			expectedErr: false,
+		},
+
+		{
+			name:        "Test Images prompt",
+			prompt:      "images",
+			config:      utils.Config{},
+			expected:    IMAGE_PROMPT,
+			expectedErr: false,
+		},
+
+		{
+			name:        "Test Research prompt",
+			prompt:      "research",
+			config:      utils.Config{},
+			expected:    RESEARCH_PROMPT,
+			expectedErr: false,
+		},
+		{
+			name:   "Test Custom prompt form config",
+			prompt: "",
+			config: utils.Config{
+				AI: utils.AIConfig{
+					Prompt: "Custom prompt from config",
+				},
+			},
+			expected:    "Custom prompt from config",
+			expectedErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := handelPrompt(tt.prompt, tt.config)
+			if result != tt.expected {
+				t.Errorf("HandlePrompt() = %v, expected %v", result, tt.expected)
+			}
+		})
 	}
 }
