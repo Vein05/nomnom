@@ -6,38 +6,47 @@ import (
 
 func TestGenerateUniqueFilename(t *testing.T) {
 	tests := []struct {
-		name     string
-		filename string
-		counter  int
-		want     string
+		name  string
+		input string
+		want  string
 	}{
 		{
-			name:     "Basic file with extension",
-			filename: "test.txt",
-			counter:  1,
-			want:     "test_1.txt",
+			name:  "Basic file with extension",
+			input: "test.txt",
+			want:  "test(1).txt",
 		},
 		{
-			name:     "File without extension",
-			filename: "test",
-			counter:  2,
-			want:     "test_2",
+			name:  "File without extension",
+			input: "test",
+			want:  "test(1)",
 		},
 		{
-			name:     "File with existing counter",
-			filename: "test_1.txt",
-			counter:  2,
-			want:     "test_2.txt",
+			name:  "File with existing counter",
+			input: "test(1).txt",
+			want:  "test(2).txt",
+		},
+		{
+			name:  "File with higher counter",
+			input: "test(5).txt",
+			want:  "test(6).txt",
+		},
+		{
+			name:  "File with number in name",
+			input: "test123.txt",
+			want:  "test123(1).txt",
+		},
+		{
+			name:  "File with spaces",
+			input: "my document.txt",
+			want:  "my document(1).txt",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateUniqueFilename(tt.filename, tt.counter)
-			t.Logf("Test case: %s\nInput: %s\nCounter: %d\nGot: %s\nWant: %s\n",
-				tt.name, tt.filename, tt.counter, got, tt.want)
+			got := GenerateUniqueFilename(tt.input)
 			if got != tt.want {
-				t.Errorf("GenerateUniqueFilename() = %v, want %v", got, tt.want)
+				t.Errorf("GenerateUniqueFilename(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
