@@ -71,18 +71,21 @@ var defaultCategories = []FileTypeCategory{
 }
 
 type Prompts struct {
-	Name string
-	Path string
+	Name     string
+	Path     string
+	TestPath string
 }
 
 var NomNomPrompts []Prompts = []Prompts{
 	{
-		Name: "research",
-		Path: "../../data/prompts/research.txt",
+		Name:     "research",
+		Path:     "data/prompts/research.txt",
+		TestPath: "../../data/prompts/research.txt",
 	},
 	{
-		Name: "images",
-		Path: "../../data/prompts/images.txt",
+		Name:     "images",
+		Path:     "data/prompts/images.txt",
+		TestPath: "../../data/prompts/images.txt",
 	}}
 
 // NewQuery creates a new Query object with the given parameters.
@@ -181,7 +184,7 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 
 			// Handle duplicate filenames
 			if _, err := os.Stat(newPath); err == nil {
-				newPath = utils.GenerateUniqueFilename(newPath, counter)
+				newPath = utils.GenerateUniqueFilename(newPath)
 				fmt.Printf("[2/6] Duplicate file detected, renaming to: %s\n", newPath)
 
 			}
@@ -410,18 +413,28 @@ func handelPrompt(prompt string, config utils.Config) string {
 			return prompt
 		}
 	} else if prompt == "research" {
+		// Try production path first
 		t, err := os.ReadFile(NomNomPrompts[0].Path)
 		if err != nil {
-			log.Printf("[2/6] ❌ Failed to read research prompt: %v", err)
-			return DEFAULT_PROMPT
+			// If production path fails, try test path
+			t, err = os.ReadFile(NomNomPrompts[0].TestPath)
+			if err != nil {
+				fmt.Printf("[2/6] ❌ Failed to read research prompt from both paths: %v", err)
+				return DEFAULT_PROMPT
+			}
 		}
 		prompt = string(t)
 		return prompt
 	} else if prompt == "images" {
+		// Try production path first
 		t, err := os.ReadFile(NomNomPrompts[1].Path)
 		if err != nil {
-			log.Printf("[2/6] ❌ Failed to read images prompt: %v", err)
-			return DEFAULT_PROMPT
+			// If production path fails, try test path
+			t, err = os.ReadFile(NomNomPrompts[1].TestPath)
+			if err != nil {
+				fmt.Printf("[2/6] ❌ Failed to read images prompt from both paths: %v", err)
+				return DEFAULT_PROMPT
+			}
 		}
 		prompt = string(t)
 		return prompt
