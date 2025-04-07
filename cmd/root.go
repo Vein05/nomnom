@@ -21,6 +21,7 @@ type args struct {
 	log         bool
 	revert      string
 	organize    bool
+	prompt      string
 }
 
 var cmdArgs = &args{}
@@ -52,7 +53,7 @@ var rootCmd = &cobra.Command{
 		fmt.Printf("[2/6] Creating new query...\n")
 		// Create a new query
 		query, err := contentprocessors.NewQuery(
-			"",
+			cmdArgs.prompt,
 			cmdArgs.dir,
 			cmdArgs.configPath,
 			config,
@@ -147,6 +148,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&cmdArgs.log, "log", "l", true, "Enable logging to file")
 	rootCmd.Flags().StringVarP(&cmdArgs.revert, "revert_path", "r", "", "Path to the changes file to revert operations from")
 	rootCmd.Flags().BoolVarP(&cmdArgs.organize, "organize", "o", true, "Organize files into folders based on content")
+	rootCmd.Flags().StringVarP(&cmdArgs.prompt, "prompt", "p", "", "The prompt you want to use for the AI model. If not provided, the default prompt will be used.")
 
 	// Add a PreRunE to validate flags
 	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
