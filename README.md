@@ -9,6 +9,30 @@
 
 </div>
 
+## Table of Contents
+- [Demo](#demo)
+- [Features ✨](#features)
+- [Things to Know](#things-to-know)
+- [Installation](#installation)
+  - [Requirements](#requirements)
+  - [MacOS/Linux](#macoslinux)
+  - [Windows](#windows)
+- [Quick Start 🚀](#quick-start-)
+- [Usage 📖](#usage-)
+  - [Basic Command](#basic-command)
+  - [Available Flags](#available-flags)
+  - [Configuration](#configuration)
+  - [AI Provider Examples](#ai-provider-examples)
+  - [Parallel Processing 🔄](#parallel-processing-)
+  - [File Name Validation](#file-name-validation)
+  - [File Organization 📂](#file-organization-)
+  - [Prompting](#prompting)
+  - [Logging and Reverting](#logging-and-reverting)
+- [Commands](#commands)
+- [Content Extraction Settings](#content-extraction-settings)
+- [Performance](#performance)
+
+
 ## Demo
 <div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
   <p> With Dry Run </p>
@@ -23,7 +47,7 @@
 </div>
 
 
-## Features ✨
+## Features
 
 - 🗂️ **Bulk Processing**: Rename entire folders(and their sub folders) of files in one go
 - 🔧 **Configurable Prompts**: Customize AI prompts to match YOUR specific naming needs and preferences
@@ -390,6 +414,7 @@ nomnom -r "demo/nomnom/logs/changes_1743284325.json"
 
 
 ### Content Extraction Settings
+
 - `extract_text`: Enable text extraction from files
 - `extract_metadata`: Enable metadata extraction
 - `max_content_length`: Maximum content length to process (default: 5000 characters)
