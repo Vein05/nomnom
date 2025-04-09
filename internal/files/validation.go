@@ -89,3 +89,16 @@ func IsAValidFileName(s string) (bool, string) {
 
 	return true, ""
 }
+
+func IsImageFile(fileName string) bool {
+	// Check if the file name has an image extension
+	imageExtensions := []string{".png", ".jpg", ".jpeg", ".webp"}
+	for _, ext := range imageExtensions {
+		if strings.HasSuffix(strings.ToLower(fileName), ext) {
+			fmt.Printf("[4/6] The file is an image file with extension: %s\n", ext)
+			return true
+		}
+	}
+
+	return false
+}
