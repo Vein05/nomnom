@@ -20,13 +20,19 @@ type Config struct {
 	Logging           LoggingConfig           `json:"logging"`
 }
 
+type VisionConfig struct {
+	Enabled      bool   `json:"enabled"`
+	MaxImageSize string `json:"max_image_size,omitempty"`
+}
+
 type AIConfig struct {
-	Provider    string  `json:"provider"`
-	Model       string  `json:"model"`
-	APIKey      string  `json:"api_key,omitempty"`
-	MaxTokens   int     `json:"max_tokens"`
-	Temperature float64 `json:"temperature"`
-	Prompt      string  `json:"prompt"`
+	Provider    string       `json:"provider"`
+	Model       string       `json:"model"`
+	APIKey      string       `json:"api_key,omitempty"`
+	Vision      VisionConfig `json:"vision"`
+	MaxTokens   int          `json:"max_tokens"`
+	Temperature float64      `json:"temperature"`
+	Prompt      string       `json:"prompt"`
 }
 
 type FileHandlingConfig struct {
