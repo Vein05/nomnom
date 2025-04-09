@@ -129,6 +129,9 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 
 	client.Timeout = parsedTimeout
 
+	if config.AI.Vision.Enabled {
+		fmt.Printf("[3/6] You're using the vision mode, please make sure the model you're using is multimodal. \n")
+	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -145,13 +148,17 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			wg.Add(1)
 			go func(j int, file *contentprocessors.File) {
 				defer wg.Done()
-				defer func() { <-sem }() // Release worker slot
-				doAI(j, file, opts, query, client, results)
+				defer func() { <-sem }()                                          // Release worker slot
+				if config.AI.Vision.Enabled && fileutils.IsImageFile(file.Path) { // Note: Trust the user to set the right config
+					doVisionAI(j, file, opts, query, client, results) // Note: We don't have any checks for failures here because our failure is handled in our retry logic with defaults to doAI()
+				} else {
+					doAI(j, file, opts, query, client, results)
+				}
 			}(j, &folder.FileList[j])
 		}
 
 		// Collect results for current folder's files
-		for i := 0; i < len(folder.FileList); i++ {
+		for range folder.FileList {
 			res := <-results
 			if res.err != nil {
 				fmt.Printf("[3/6] ❌ Failed to process file: %s. Error: %v\n",
@@ -265,6 +272,51 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
 
 	// Remove new lines and spaces from the new name
+	newName = strings.ReplaceAll(newName, "\n", "")
+	newName = strings.ReplaceAll(newName, " ", "")
+	newName = fileutils.CheckAndAddExtension(newName, file.Name)
+
+	results <- result{j, newName, nil}
+}
+
+func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
+	if query.Prompt == "" {
+		results <- result{j, "", fmt.Errorf("no prompt provided")}
+		return
+	}
+
+	base64Image, err := deepseek.ImageToBase64(file.Path)
+	if err != nil {
+		results <- result{j, "", fmt.Errorf("error opening image file: %v", err)}
+		return
+	}
+	request := &deepseek.ChatCompletionRequestWithImage{
+		Model: opts.Model,
+		Messages: []deepseek.ChatCompletionMessageWithImage{
+			{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
+			deepseek.NewImageMessage("user", file.Context, base64Image),
+		},
+	}
+
+	// Send the request and handle the response
+	ctx := context.Background()
+	response, err := client.CreateChatCompletionWithImage(ctx, request)
+	if err != nil {
+		fmt.Printf("[3/6] ❌ Error creating chat completion for %s : will get added to retry!\n", file.Name)
+		results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		return
+	}
+
+	if response.Choices[0].Message.Content == "" {
+		fmt.Printf("[3/6] ❌ Error creating chat completion for %s : will get added to retry!\n", file.Name)
+		results <- result{j, "", fmt.Errorf("empty response from AI")}
+		return
+	}
+
+	refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
+
+	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
+
 	newName = strings.ReplaceAll(newName, "\n", "")
 	newName = strings.ReplaceAll(newName, " ", "")
 	newName = fileutils.CheckAndAddExtension(newName, file.Name)

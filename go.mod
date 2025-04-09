@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.1
 
 require (
-	github.com/cohesion-org/deepseek-go v1.2.5
+	github.com/cohesion-org/deepseek-go v1.2.10
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/gen2brain/go-fitz v1.24.14
 	github.com/manifoldco/promptui v0.9.0

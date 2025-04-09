@@ -28,7 +28,7 @@ func ReadFile(path string) (string, error) {
 		return content, nil
 	}
 
-	if extension == "png" || extension == "jpg" || extension == "jpeg" {
+	if extension == "png" || extension == "jpg" || extension == "jpeg" || extension == ".webp" {
 		text, err := readImageFile(path)
 		if err != nil {
 			return "There was an error reading the file" + path, err
