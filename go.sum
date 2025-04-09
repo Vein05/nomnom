@@ -4,8 +4,10 @@ github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e h1:fY5BOSpyZCqRo5O
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 h1:q763qf9huN11kDQavWsoZXJNW3xEE4JJyHa5Q25/sd8=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
-github.com/cohesion-org/deepseek-go v1.2.5 h1:XN2fVju0+hgDC0ULMS+tKznBK2y5ZW/NAj1OPIdGFco=
-github.com/cohesion-org/deepseek-go v1.2.5/go.mod h1:Mi/tP7IzBoXxDC606CFbJC5Ofk2HCikCayBXweo1RDg=
+github.com/cohesion-org/deepseek-go v1.2.9 h1:H6FvDb1iVE9o33yagyeUIm4Em5TY/5EOkLV/BkOcAbE=
+github.com/cohesion-org/deepseek-go v1.2.9/go.mod h1:nPPJT25HSnmxaQJCC4ZFAdbhKjoXN0GbZ4dSsHYxhG0=
+github.com/cohesion-org/deepseek-go v1.2.10 h1:j/X0CHFJ5z36r3r4oBPMHiy3SIxd9wLnf1L8U0rpIrw=
+github.com/cohesion-org/deepseek-go v1.2.10/go.mod h1:nPPJT25HSnmxaQJCC4ZFAdbhKjoXN0GbZ4dSsHYxhG0=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
