@@ -368,7 +368,12 @@ To use NomNom's vision capabilities for image renaming:
   nomnom -d /path/to/images -p images
 ```
 
-3. **Supported Image Types**
+3. **Run NomNom Normally**
+```bash
+  nomnom -d /path/to/images 
+```
+
+4. **Supported Image Types**
   - PNG, JPG/JPEG, GIF, WebP
   - Max file size: 10MB per image (present in config)
   - Recommended: Less than 100 images per batch for optimal performance
