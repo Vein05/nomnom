@@ -125,7 +125,7 @@ cp config.example.json ~/.config/nomnom/config.json
 
 ### Windows
 
-```
+```bash
 # Clone the repository
 git clone https://github.com/vein05/nomnom.git
 cd nomnom
