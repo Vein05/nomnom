@@ -28,6 +28,7 @@
   - [File Organization 📂](#file-organization-)
   - [Prompting](#prompting)
   - [Logging and Reverting](#logging-and-reverting)
+  - [Using Vision](#vision)
 - [Examples](#commands)
 - [Testing](#testing)
 
@@ -56,7 +57,7 @@
   - Text files
   - Documents (PDF, DOCX) - First 2 pages analyzed for context
   - Presentations
-  - Images (metadata and OCR text extraction)[Vison Support coming soon!]
+  - Images (metadata and OCR text extraction) or Vision
   - Videos (metadata)
 - 🤖 **AI-Powered**: Multiple AI provider options:
   - DeepSeek V3/R1 model
@@ -339,6 +340,40 @@ The revert operation will:
 5. Display progress and results in the terminal
 
 Note: The revert operation is non-destructive - it creates copies of files rather than moving or deleting existing ones.
+
+### Vision
+
+To use NomNom's vision capabilities for image renaming:
+
+1. **Configure Vision Provider**
+
+```json
+  {
+    "ai": {
+        "api_key": "",
+        "provider": "openrouter",
+        "model": "google/gemini-2.0-flash-lite-001",
+        "vision" : {
+          "enabled": true,
+          "max_image_size": "10MB"
+        },
+        "max_tokens": 1000,
+        "temperature": 0.7
+      }
+  }
+```
+
+2. **Run NomNom with Vision Prompt**
+```bash
+  nomnom -d /path/to/images -p images
+```
+
+3. **Supported Image Types**
+  - PNG, JPG/JPEG, GIF, WebP
+  - Max file size: 10MB per image (present in config)
+  - Recommended: Less than 100 images per batch for optimal performance
+
+> **Note**: Vision features require a compatible AI provider (like Claude 3 or GPT-4V). Local models through Ollama currently don't support vision capabilities.
 
 ## Commands
 
