@@ -12,6 +12,7 @@ import (
 
 	"slices"
 
+	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 )
 
@@ -30,10 +31,12 @@ type Query struct {
 
 // ProcessResult represents the result of processing files
 type ProcessResult struct {
-	OriginalPath string
-	NewPath      string
-	Success      bool
-	Error        error
+	OriginalPath     string
+	NewPath          string
+	FullOriginalPath string
+	FullNewPath      string
+	Success          bool
+	Error            error
 }
 
 // SafeProcessor handles file processing in safe mode
@@ -86,11 +89,11 @@ var NomNomPrompts []Prompts = []Prompts{
 		Name:     "images",
 		Path:     "data/prompts/images.txt",
 		TestPath: "../../data/prompts/images.txt",
-	}}
+	},
+}
 
 // NewQuery creates a new Query object with the given parameters.
 func NewQuery(prompt string, dir string, configPath string, config utils.Config, autoApprove bool, dryRun bool, log bool, organize bool) (*Query, error) {
-
 	prompt = handelPrompt(strings.ToLower(prompt), config)
 	folders, err := ProcessDirectory(dir, config)
 	if err != nil {
@@ -128,44 +131,44 @@ func NewSafeProcessor(query *Query, output string) *SafeProcessor {
 
 // Process handles the safe mode processing workflow
 func (p *SafeProcessor) Process() ([]ProcessResult, error) {
-	fmt.Printf("[2/6] Starting safe mode processing \n")
+	fmt.Printf("%s Starting safe mode processing\n", color.WhiteString("▶ "))
 	results := make([]ProcessResult, 0)
 
 	if p.query.DryRun {
-		fmt.Printf("[2/6] Dry run: Would create output directory\n")
+		fmt.Printf("%s Dry run: Would create output directory\n", color.WhiteString("▶ "))
 	} else {
 		// Create output directory if it doesn't exist
 		if err := os.MkdirAll(p.output, 0755); err != nil {
-			log.Printf("[2/6] ❌ Failed to create output directory: %v", err)
+			log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to create output directory: %v", err))
 			return nil, fmt.Errorf("failed to create output directory: %w", err)
 		}
-		fmt.Printf("[2/6] Created output directory: %s\n", p.output)
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Created output directory: %s", p.output))
 	}
 
 	// First phase: Copy all files with original structure
 	if !p.query.DryRun {
 		if !p.query.Organize {
-			fmt.Printf("[2/6] Starting file copy phase in original structure.\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Starting file copy phase in original structure"))
 			if err := p.copyOriginalStructure(); err != nil {
-				log.Printf("[2/6] ❌ Failed to copy original structure: %v", err)
+				log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to copy original structure: %v", err))
 				return nil, fmt.Errorf("failed to copy original structure: %w", err)
 			}
 		} else {
-			fmt.Printf("[2/6] Starting file copy phase in Organized structure\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Starting file copy phase in organized structure"))
 			if err := p.copyOrganizedStructure(); err != nil {
-				log.Printf("[2/6] ❌ Failed to copy organized structure: %v", err)
+				log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to copy organized structure: %v", err))
 				return nil, fmt.Errorf("failed to copy organized structure: %w", err)
 			}
 		}
-		fmt.Printf("[2/6] Completed file copy phase\n")
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("Completed file copy phase"))
 	}
 
 	// Second phase: Process and rename files
-	fmt.Printf("[2/6] Starting file processing phase\n")
+	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("Starting file processing phase"))
 
 	var processFolder func(folder FolderType, relativePath string) error
 	processFolder = func(folder FolderType, relativePath string) error {
-		fmt.Printf("[2/6] Processing folder: %s, files: %d\n", folder.Name, len(folder.FileList))
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("Processing folder: %s, files: %d", folder.Name, len(folder.FileList)))
 		counter := 0
 		for _, file := range folder.FileList {
 			var (
@@ -185,21 +188,28 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 			// Handle duplicate filenames
 			if _, err := os.Stat(newPath); err == nil {
 				newPath = utils.GenerateUniqueFilename(newPath)
-				fmt.Printf("[2/6] Duplicate file detected, renaming to: %s\n", newPath)
-
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Duplicate file detected, renaming to: %s", newPath))
+			}
+			fullPath, err := filepath.Abs(file.UNCHANGEDPATH)
+			if err != nil {
+				log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Error getting absolute path: %v", err))
 			}
 
-			fmt.Printf("[2/6] Processing file: %s\n", file.Name)
-
+			fullNewPath, err := filepath.Abs(newPath)
+			if err != nil {
+				log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Error getting absolute path: %v", err))
+			}
 			result := ProcessResult{
-				OriginalPath: file.Path,
-				NewPath:      newPath,
-				Success:      true,
+				OriginalPath:     file.UNCHANGEDPATH,
+				FullOriginalPath: fullPath,
+				FullNewPath:      fullNewPath,
+				NewPath:          newPath,
+				Success:          true,
 			}
 
 			// Skip if no new name was generated
 			if file.NewName == "" {
-				fmt.Printf("[2/6] No new name generated for: %s\n", file.Name)
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("No new name generated for: %s", file.Name))
 				results = append(results, result)
 				continue
 			}
@@ -207,30 +217,30 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 			// In non-dry-run mode, rename the copied file
 			if !p.query.DryRun {
 				if !p.query.AutoApprove && counter == 0 {
-					fmt.Printf("[2/6] Auto approve is disabled\n")
+					fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Auto approve is disabled"))
 				}
 
 				if !p.query.AutoApprove {
 					response, err := p.promptForRenameApproval(file.Name, file.NewName)
 					if err != nil {
-						log.Printf("[2/6] ❌ Error running prompt: %v", err)
+						log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Error running prompt: %v", err))
 					}
 					if response == "no" {
-						fmt.Printf("[2/6] Skipping rename for: %s\n", file.Name)
+						fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Skipping rename for: %s", file.Name))
 						continue
 					}
 					if response == "approve all" {
 						p.query.AutoApprove = true
-						fmt.Printf("[2/6] Auto approving all renames\n")
+						fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Auto approving all renames"))
 					}
 				}
 
 				if err := os.Rename(currentPath, newPath); err != nil {
-					log.Printf("[2/6] ❌ Failed to rename file: %v", err)
+					log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to rename file: %v", err))
 					result.Success = false
 					result.Error = fmt.Errorf("failed to rename file: %w", err)
 				} else {
-					fmt.Printf("[2/6] Successfully renamed file\n")
+					fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Successfully renamed file"))
 				}
 			}
 
@@ -256,7 +266,7 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	// Start processing from root folders
 	for _, folder := range p.query.Folders {
 		if err := processFolder(folder, folder.Name); err != nil {
-			log.Printf("[2/6] ❌ Failed to process folder: %s, error: %v", folder.Name, err)
+			log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to process folder: %s, error: %v", folder.Name, err))
 			return nil, fmt.Errorf("failed to process folder %s: %w", folder.Name, err)
 		}
 	}
@@ -264,13 +274,13 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	// Close the logger if it exists
 	if p.query.Logger != nil {
 		if err := p.query.Logger.Close(); err != nil {
-			log.Printf("[2/6] ❌ Failed to close logger: %v", err)
+			log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to close logger: %v", err))
 		} else {
-			fmt.Printf("[2/6] Successfully closed logger\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Successfully closed logger"))
 		}
 	}
 
-	fmt.Printf("[2/6] Completed file processing phase\n")
+	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Completed file processing phase"))
 	return results, nil
 }
 
@@ -293,6 +303,7 @@ func getCategoryForFile(fileName string) string {
 	}
 	return "Others"
 }
+
 func (p *SafeProcessor) copyOrganizedStructure() error {
 	// Create category folders only at root level
 	for _, category := range defaultCategories {
@@ -351,17 +362,17 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 		// Create folder in output directory
 		outFolder := filepath.Join(p.output, relativePath)
 		if err := os.MkdirAll(outFolder, 0755); err != nil {
-			log.Printf("[2/6] ❌ Failed to create output folder: %s, error: %v", outFolder, err)
+			log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to create output folder: %s, error: %v", outFolder, err))
 			return fmt.Errorf("failed to create output folder %s: %w", outFolder, err)
 		}
-		fmt.Printf("[2/6] Created output folder: %s\n", outFolder)
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Created output folder: %s", outFolder))
 
 		// Copy each file with original name
 		for i := range folder.FileList {
 			file := &folder.FileList[i]
 			dstPath := filepath.Join(outFolder, file.Name)
 			if err := copyFile(file.Path, dstPath); err != nil {
-				log.Printf("[2/6] ❌ Failed to copy file: %s to %s, error: %v", file.Path, dstPath, err)
+				log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to copy file: %s to %s, error: %v", file.Path, dstPath, err))
 				return fmt.Errorf("failed to copy file %s: %w", file.Path, err)
 			}
 			file.Path = dstPath
@@ -390,12 +401,12 @@ func (p *SafeProcessor) copyOriginalStructure() error {
 func copyFile(src, dst string) error {
 	input, err := os.ReadFile(src)
 	if err != nil {
-		log.Printf("[2/6] ❌ Failed to read source file: %s, error: %v", src, err)
+		log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to read source file: %s, error: %v", src, err))
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
 	if err := os.WriteFile(dst, input, 0644); err != nil {
-		log.Printf("[2/6] ❌ Failed to write destination file: %s, error: %v", dst, err)
+		log.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to write destination file: %s, error: %v", dst, err))
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 	return nil
@@ -419,7 +430,7 @@ func handelPrompt(prompt string, config utils.Config) string {
 			// If production path fails, try test path
 			t, err = os.ReadFile(NomNomPrompts[0].TestPath)
 			if err != nil {
-				fmt.Printf("[2/6] ❌ Failed to read research prompt from both paths: %v", err)
+				fmt.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to read research prompt from both paths: %v", err))
 				return DEFAULT_PROMPT
 			}
 		}
@@ -432,7 +443,7 @@ func handelPrompt(prompt string, config utils.Config) string {
 			// If production path fails, try test path
 			t, err = os.ReadFile(NomNomPrompts[1].TestPath)
 			if err != nil {
-				fmt.Printf("[2/6] ❌ Failed to read images prompt from both paths: %v", err)
+				fmt.Printf("%s %s", color.WhiteString("▶ "), color.RedString("Failed to read images prompt from both paths: %v", err))
 				return DEFAULT_PROMPT
 			}
 		}
