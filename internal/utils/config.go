@@ -70,7 +70,7 @@ type LoggingConfig struct {
 	LogPath string `json:"log_path"`
 }
 
-func LoadConfig(path string) Config {
+func LoadConfig(path string, step string) Config {
 	// Check if path is empty and set default based on OS
 	if path == "" {
 		if runtime.GOOS == "windows" {
@@ -89,7 +89,7 @@ func LoadConfig(path string) Config {
 		}
 	}
 
-	fmt.Printf("[1/6] Loading config from: %s\n", path)
+	fmt.Printf(step+"Loading config from: %s\n", path)
 
 	file, err := os.ReadFile(path)
 	if err != nil {
