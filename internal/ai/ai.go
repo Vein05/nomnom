@@ -15,6 +15,7 @@ import (
 	utils "nomnom/internal/utils"
 
 	deepseek "github.com/cohesion-org/deepseek-go"
+	"github.com/fatih/color"
 )
 
 // QueryOpts contains options for the query
@@ -40,40 +41,39 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 	// we currently check if we are serving deepseek, ollama or openrouter
 	if config.AI.Provider != "" {
 		if config.AI.Provider == "deepseek" {
-			fmt.Printf("[3/6] Using deepseek as AI provider\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Using deepseek as AI provider"))
 			aiModel = "deepseek"
 		} else if config.AI.Provider == "ollama" {
-			fmt.Printf("[3/6] Using ollama as AI provider\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Using ollama as AI provider"))
 			aiModel = "ollama"
 		} else if config.AI.Provider == "openrouter" {
-			fmt.Printf("[3/6] Using openrouter as AI provider\n")
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Using openrouter as AI provider"))
 			aiModel = "openrouter"
 		} else {
-			fmt.Printf("[3/6] ❌ Invalid AI provider: %s\n", config.AI.Provider)
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Invalid AI provider: %s", config.AI.Provider))
 			return contentprocessors.Query{}, fmt.Errorf("invalid AI provider: %s", config.AI.Provider)
 		}
 	} else {
 		aiModel = "deepseek"
-		fmt.Printf("[3/6] No AI provider set, defaulting to deepseek\n")
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("No AI provider set, defaulting to deepseek"))
 	}
 
 	// now we check if have an api key for the provider, if not let the user know and default to env variable
 	// we skip ollama as it does not require an api key
 	if aiModel != "ollama" {
 		if config.AI.APIKey == "" {
-			fmt.Printf("[3/6] No API key set for AI provider, checking environment variables\n")
-
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("No API key set for AI provider, checking environment variables"))
 			// we check if the api key is set in the environment variables
 			if os.Getenv("DEEPSEEK_API_KEY") != "" && (aiModel == "deepseek" || aiModel == "") {
-				fmt.Printf("[3/6] ✅ Found deepseek API key in environment variable\n")
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Found deepseek API key in environment variable"))
 				config.AI.APIKey = os.Getenv("DEEPSEEK_API_KEY")
 				aiModel = "deepseek"
 			} else if os.Getenv("OPENROUTER_API_KEY") != "" && (aiModel == "openrouter" || aiModel == "") {
-				fmt.Printf("[3/6] ✅ Found openrouter API key in environment variable\n")
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("Found openrouter API key in environment variable"))
 				config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
 				aiModel = "openrouter"
 			} else {
-				fmt.Printf("[3/6] ❌ No API key found for %s provider\n", aiModel)
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("No API key found for %s provider", aiModel))
 				return contentprocessors.Query{}, fmt.Errorf("no API key found for provider %s", aiModel)
 			}
 		}
@@ -112,25 +112,25 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 // SendQueryToLLM sends a query to an LLM API to generate new file names
 func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts QueryOpts) error {
 	// load config
-	config := utils.LoadConfig(query.ConfigPath)
+	config := utils.LoadConfig(query.ConfigPath, color.WhiteString("▶  "))
 	performanceOpts := config.Performance.AI
 	workers := performanceOpts.Workers
 	timeout := performanceOpts.Timeout
 	retries := performanceOpts.Retries
 
-	fmt.Printf("[3/6] ⚙️ AI processing configuration - Workers: %d, Timeout: %s, Retries: %d\n",
-		workers, timeout, retries)
+	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d",
+		workers, timeout, retries))
 
 	parsedTimeout, err := time.ParseDuration(timeout)
 	if err != nil {
-		fmt.Printf("[3/6] ❌ Failed to parse timeout: %v\n", err)
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Failed to parse timeout: %v", err))
 		return err
 	}
 
 	client.Timeout = parsedTimeout
 
 	if config.AI.Vision.Enabled {
-		fmt.Printf("[3/6] You're using the vision mode, please make sure the model you're using is multimodal. \n")
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("You're using the vision mode, please make sure the model you're using is multimodal"))
 	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -161,8 +161,8 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		for range folder.FileList {
 			res := <-results
 			if res.err != nil {
-				fmt.Printf("[3/6] ❌ Failed to process file: %s. Error: %v\n",
-					folder.FileList[res.index].Name, res.err)
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Failed to process file: %s. Error: %v",
+					folder.FileList[res.index].Name, res.err))
 				folder.FileList[res.index].NewName = res.name
 				continue
 			}
@@ -184,8 +184,8 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 				break
 			}
 
-			fmt.Printf("[3/6] 🔄 Retry attempt %d/%d for %d files\n",
-				retryAttempt+1, retries, len(failedIndices))
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Retry attempt %d/%d for %d files",
+				retryAttempt+1, retries, len(failedIndices)))
 
 			retryResults := make(chan result, len(failedIndices))
 
@@ -232,7 +232,6 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 
 func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
 	// Create a chat completion request
-
 	if query.Prompt == "" {
 		results <- result{j, "", fmt.Errorf("no prompt provided")}
 		return
@@ -302,13 +301,13 @@ func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query conte
 	ctx := context.Background()
 	response, err := client.CreateChatCompletionWithImage(ctx, request)
 	if err != nil {
-		fmt.Printf("[3/6] ❌ Error creating chat completion for %s : will get added to retry!\n", file.Name)
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
 		results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
 		return
 	}
 
 	if response.Choices[0].Message.Content == "" {
-		fmt.Printf("[3/6] ❌ Error creating chat completion for %s : will get added to retry!\n", file.Name)
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
 		results <- result{j, "", fmt.Errorf("empty response from AI")}
 		return
 	}

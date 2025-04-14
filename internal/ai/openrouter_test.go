@@ -15,7 +15,7 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 		t.Skip("OPENROUTER_API_KEY not set, skipping test")
 	}
 
-	config := configutils.LoadConfig("") // Updated path to point to config in main folder
+	config := configutils.LoadConfig("", "") // Updated path to point to config in main folder
 
 	config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
 
