@@ -6,11 +6,11 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	config := LoadConfig("")
+	config := LoadConfig("", "")
 	fmt.Println(config)
 }
 
 func TestLoadConfigWithHomeDir(t *testing.T) {
-	config := LoadConfig("")
+	config := LoadConfig("", "")
 	fmt.Println(config)
 }

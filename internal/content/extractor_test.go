@@ -8,7 +8,7 @@ import (
 )
 
 func TestProcessDirectory(t *testing.T) {
-	config := utils.LoadConfig("")
+	config := utils.LoadConfig("", "")
 	path := "/Users/vein/Documents/nomnom/demo"
 	query, err := ProcessDirectory(path, config)
 	if err != nil {
