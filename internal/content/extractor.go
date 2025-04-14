@@ -10,6 +10,8 @@ import (
 
 	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
+
+	"github.com/fatih/color"
 )
 
 const (
@@ -104,6 +106,7 @@ func convertSize(size string) (int64, error) {
 
 // ProcessDirectory processes a directory and returns a Query object
 func ProcessDirectory(dir string, config utils.Config) (Query, error) {
+
 	performanceOpts := config.Performance.File
 	workers := performanceOpts.Workers
 	timeout := performanceOpts.Timeout
@@ -120,7 +123,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		retries = 1
 	}
 
-	fmt.Printf("[2/6] Nomnom: File processing is running with: %d workers, %s timeout, %d retries\n", workers, timeout, retries)
+	color.Blue("File processing is running with: %d workers, %s timeout, %d retries\n", workers, timeout, retries)
 
 	var query Query
 
@@ -250,7 +253,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 	}
 
 	query.Folders = append(query.Folders, *rootFolder)
-	fmt.Printf("[2/6] Successfully processed directory: %s\n", dir)
+	fmt.Printf("Successfully processed directory: %s\n", dir)
 	return query, nil
 }
 
