@@ -34,17 +34,7 @@
 
 
 ## Demo
-<div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
-  <p> With Dry Run </p>
-
-  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_1.gif?raw=true" alt="First">
-  <p> Without Dry Run </p>
-
-  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_2.gif?raw=true" alt="Second">
-  <p> Organization </p>
-  
-  <img src="https://github.com/Vein05/nomnom-data/blob/main/Clip_3.gif?raw=true">
-</div>
+<video src="https://raw.githubusercontent.com/Vein05/nomnom-data/main/Video%201.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px; min-height: 200px"> </video>
 
 
 ## Features
