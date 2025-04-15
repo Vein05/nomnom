@@ -34,7 +34,9 @@
 
 
 ## Demo
-<video src="https://raw.githubusercontent.com/Vein05/nomnom-data/main/Video%201.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px; min-height: 200px"> </video>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
+  <img src="https://raw.githubusercontent.com/Vein05/nomnom-data/refs/heads/main/output.gif">
+</div>
 
 
 ## Features
