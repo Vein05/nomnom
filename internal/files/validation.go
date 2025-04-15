@@ -23,15 +23,27 @@ func RefinedName(name string) string {
 	return name
 }
 
-func CheckAndAddExtension(s string, file string) string {
-	// Check if the string has an extension
-	if strings.Contains(s, ".") {
-		return s
-	}
-	extension := filepath.Ext(file)
+// checkAndAddExtension ensures the input string has the same file extension as the reference file.
+// If no extension exists, it adds the reference file's extension.
+// If a different extension exists, it replaces it with the reference file's extension.
+func CheckAndAddExtension(input string, referenceFile string) string {
+	// Get the reference file's extension
+	refExt := filepath.Ext(referenceFile)
 
-	fmt.Printf("[3/6] The AI did't report any extension, manually adding previous extension from path: %s\n", extension)
-	return s + extension
+	// Check if input has an extension
+	if strings.Contains(input, ".") {
+		inputExt := filepath.Ext(input)
+		// If extensions match, return input unchanged
+		if inputExt == refExt {
+			return input
+		}
+		// Replace different extension with reference extension
+		return strings.TrimSuffix(input, inputExt) + refExt
+	}
+
+	newName := input + refExt
+	// Add reference extension if input has none
+	return newName
 }
 func IsAValidFileName(s string) (bool, string) {
 	// Check empty string
