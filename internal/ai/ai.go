@@ -170,7 +170,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 		}
 
 		// Handle retries for failed files in current folder
-		for retryAttempt := 0; retryAttempt < retries; retryAttempt++ {
+		for retryAttempt := range retries {
 			failedIndices := []int{}
 
 			// Identify failed files
