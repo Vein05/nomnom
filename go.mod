@@ -11,7 +11,6 @@ require (
 	github.com/gen2brain/go-fitz v1.24.14
 	github.com/manifoldco/promptui v0.9.0
 	github.com/ollama/ollama v0.6.2
-	github.com/otiai10/gosseract/v2 v2.4.1
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/text v0.23.0
