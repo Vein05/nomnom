@@ -160,6 +160,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		output_text := fmt.Sprintf("Output directory set up at: %s", outputDir)
+		if cmdArgs.dryRun {
+			output_text = fmt.Sprintf("Output directory would be set up at: %s", outputDir)
+		}
 		fmt.Printf("%s\n", title(output_text))
 
 		fmt.Printf("%s\n", info("══════════════════════"))
