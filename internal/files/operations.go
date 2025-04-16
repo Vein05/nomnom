@@ -12,7 +12,6 @@ import (
 
 	"github.com/dhowden/tag"
 	"github.com/gen2brain/go-fitz"
-	"github.com/otiai10/gosseract/v2"
 )
 
 func ReadFile(path string) (string, error) {
@@ -68,29 +67,8 @@ func readRawFile(path string) (string, error) {
 	return string(content), nil
 }
 
-func readImageFile(path string) (string, error) {
-	// Verify file exists and is readable
-	if _, err := os.Stat(path); err != nil {
-		return "", fmt.Errorf("error accessing image file: %v", err)
-	}
-
-	client := gosseract.NewClient()
-	defer client.Close()
-
-	if err := client.SetImage(path); err != nil {
-		return "", fmt.Errorf("error setting image in Tesseract: %v", err)
-	}
-
-	text, err := client.Text()
-	if err != nil {
-		return "", fmt.Errorf("error performing OCR: %v", err)
-	}
-
-	if text == "" {
-		return "No text extracted from image file: " + path, nil
-	}
-
-	return text, nil
+func readImageFile(_ string) (string, error) {
+	return "An image will be attached with this message. If it's not attached, don't rename it.", nil
 }
 
 // convert pdf to image and then read the image using the readImageFile function

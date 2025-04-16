@@ -31,13 +31,23 @@ func TestSendQueryWithOllama(t *testing.T) {
 	// Set up test configuration
 	config := configutils.Config{
 		AI: configutils.AIConfig{
-			Model: "deepseek-r1", // Default model, can be overridden by environment
+			Model:  "llama3.2-vision:11b",
+			Prompt: "What is the name of this document or image attached to this request? If it's an image, analyse the contents to give out a proper name. Only respond with the name in snake case.",
+			Vision: configutils.VisionConfig{
+				Enabled: true,
+			},
+		},
+		Performance: configutils.PerformanceConfig{
+			AI: configutils.PerformanceAIConfig{
+				Workers: 4,
+				Timeout: "30",
+				Retries: 3,
+			},
 		},
 	}
 
 	// Create a test query with sample data
 	testQuery := contentprocessors.Query{
-		Prompt: "What is the name of this document? Only respond with the name and the extension of the file in snake case. Do not add any additional information.",
 		Folders: []contentprocessors.FolderType{
 			{
 				Name:       "TestFolder",
@@ -49,14 +59,9 @@ func TestSendQueryWithOllama(t *testing.T) {
 						Context: "This is a test file containing important information about a game called Rain World.",
 					},
 					{
-						Name:    "presentation.ppt",
-						Path:    "/test/path/presentation.ppt",
-						Context: "This is a PowerPoint presentation about quarterly sales results for Q1 2024.",
-					},
-					{
-						Name:    "report.pdf",
-						Path:    "/test/path/report.pdf",
-						Context: "This is the annual financial report for 2023 fiscal year with detailed analysis.",
+						Name:    "image.jpg",
+						Path:    "../../demo/small/Image 484972979.jpg",
+						Context: "",
 					},
 				},
 			},
