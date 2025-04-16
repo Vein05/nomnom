@@ -92,6 +92,7 @@
 
 ### Option 1: Pre-built Binaries (Recommended)
 1. Download the latest release for your system from the [Releases page](https://github.com/vein05/nomnom/releases/latest)
+    - Sorry for no arm64 builds for windows (compiler breaks, idk why ;)
 2. Extract the ZIP file
 3. Move the binary to your PATH:
 
