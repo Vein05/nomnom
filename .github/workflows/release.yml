@@ -37,6 +37,7 @@ jobs:
 
       - name: Build Binary
         env:
+          CGO_ENABLED: ${{ matrix.os == 'windows' && '1' || '0' }}
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
