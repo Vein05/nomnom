@@ -16,37 +16,57 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-// Query represents the query parameters for content processing.
+// Query represents the query parameters for content processing with the following fields:
 type Query struct {
-	Prompt      string
-	Dir         string
-	ConfigPath  string
+	// Prompt holds the user-provided text prompt for content processing
+	Prompt string
+	// Dir specifies the root directory path to process
+	Dir string
+	// ConfigPath is the path to the configuration file
+	ConfigPath string
+	// AutoApprove when true skips confirmation prompts for file operations
 	AutoApprove bool
-	DryRun      bool
-	Log         bool
-	Folders     []FolderType
-	Logger      *utils.Logger
-	Organize    bool
+	// DryRun when true simulates operations without making actual changes
+	DryRun bool
+	// Log enables logging of operations when true
+	Log bool
+	// Folders contains the hierarchical structure of directories and files to process
+	Folders []FolderType
+	// Logger provides logging functionality for operations
+	Logger *utils.Logger
+	// Organize when true enables structured organization of files by category
+	Organize bool
 }
 
-// ProcessResult represents the result of processing files
+// ProcessResult captures the outcome of file processing operations including:
 type ProcessResult struct {
-	OriginalPath     string
-	NewPath          string
+	// OriginalPath stores the initial relative path of the processed file
+	OriginalPath string
+	// NewPath contains the new relative path after processing
+	NewPath string
+	// FullOriginalPath stores the initial absolute path of the processed file
 	FullOriginalPath string
-	FullNewPath      string
-	Success          bool
-	Error            error
+	// FullNewPath contains the new absolute path after processing
+	FullNewPath string
+	// Success indicates whether the processing operation succeeded
+	Success bool
+	// Error holds any error that occurred during processing
+	Error error
 }
 
-// SafeProcessor handles file processing in safe mode
+// SafeProcessor implements safe file processing operations with validation
 type SafeProcessor struct {
-	query  *Query
+	// query holds the processing parameters and configuration
+	query *Query
+	// output specifies the destination directory for processed files
 	output string
 }
 
+// FileTypeCategory defines a group of file extensions belonging to a category
 type FileTypeCategory struct {
-	Name       string
+	// Name is the category identifier (e.g., "Images", "Documents")
+	Name string
+	// Extensions lists the file extensions that belong to this category
 	Extensions []string
 }
 
@@ -73,10 +93,11 @@ var defaultCategories = []FileTypeCategory{
 	},
 }
 
+// FolderType represents a directory structure containing files and subfolders
 type Prompts struct {
-	Name     string
-	Path     string
-	TestPath string
+	Name     string // Name of the prompt
+	Path     string // Path to the prompt file in the production environment
+	TestPath string // Path to the prompt file in the test environment
 }
 
 var NomNomPrompts []Prompts = []Prompts{
