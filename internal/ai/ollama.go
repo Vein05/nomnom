@@ -5,17 +5,19 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 
 	contentprocessors "nomnom/internal/content"
 	fileutils "nomnom/internal/files"
 	configutils "nomnom/internal/utils"
+	utils "nomnom/internal/utils"
 
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/fatih/color"
 	api "github.com/ollama/ollama/api"
 )
 
-func SendQueryWithOllama(config configutils.Config, query contentprocessors.Query) (result contentprocessors.Query, err error) {
+func SendQueryWithOllama(config configutils.Config, query contentprocessors.Query) (q contentprocessors.Query, err error) {
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to create client: %v", err))
@@ -24,70 +26,113 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 
 	model := config.AI.Model
 	if model == "" {
-		return contentprocessors.Query{}, fmt.Errorf("Ollama model not specified. Quiting the program!")
-	}
-
-	prompt := config.AI.Prompt
-	if prompt == "" {
-		prompt = query.Prompt
-		if prompt == "" {
-			prompt = "What is the name of this document? Only respond with the name and the extension of the file in snake case. Do not respond with anything else!"
-		}
+		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("No model provided", err))
+		return contentprocessors.Query{}, err
 	}
 
 	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("You're using Ollama with model: %s", model))
 
-	// performanceOpts := config.Performance.AI
-	// workers := performanceOpts.Workers
-	// timeout := performanceOpts.Timeout
-	// retries := performanceOpts.Retries
+	performanceOpts := config.Performance.AI
+	workers := performanceOpts.Workers
+	timeout := performanceOpts.Timeout
+	retries := performanceOpts.Retries
 
-	// fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d",
-	// 	workers, timeout, retries))
+	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d",
+		workers, timeout, retries))
 
-	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Parallel processing doesn't work with Ollama yet."))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-	// Process each folder's files
-	// This doesn't go through every sub folder and such.
-	// Todo: Add a recursive function to process directories for this
-	for i := range query.Folders {
-		folder := &query.Folders[i]
-		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("Processing folder: %s", folder.Name))
+	// Create a recursive function to process folders
+	var processFolder func(folder *contentprocessors.FolderType) error
+	processFolder = func(folder *contentprocessors.FolderType) error {
+		// Create channels for the current folder's processing
+		sem := make(chan struct{}, workers)
+		results := make(chan Result, len(folder.FileList))
 
-		// Process each file in the folder
+		// Process files in current folder
 		for j := range folder.FileList {
-			file := &folder.FileList[j]
+			sem <- struct{}{} // Acquire worker slot
+			wg.Add(1)
+			go func(j int, file *contentprocessors.File) {
+				defer wg.Done()
+				defer func() { <-sem }()                            // Release worker slot
+				doAIOllama(j, file, query, client, results, config) // Process file
+			}(j, &folder.FileList[j])
+		}
 
-			messages := createMessage(*file, fileutils.IsImageFile(file.Path), prompt, file.Context)
-			if len(messages) == 0 {
-				fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to create message for file %s", file.Name))
+		// Collect results for current folder's files
+		for range folder.FileList {
+			res := <-results
+			if res.err != nil {
+				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Failed to process file: %s. Error: %v",
+					folder.FileList[res.index].Name, res.err))
+				folder.FileList[res.index].NewName = res.name
 				continue
 			}
+			folder.FileList[res.index].NewName = res.name
+		}
 
-			var newName string
-			resp := func(response api.ChatResponse) error {
-				newName = removeThink(response.Message.Content)
-				newName = fileutils.CheckAndAddExtension(newName, file.Name)
-				return nil
+		// Handle retries for failed files in current folder
+		for retryAttempt := range retries {
+			failedIndices := []int{}
+
+			// Identify failed files
+			for i, file := range folder.FileList {
+				if file.NewName == "NOMNOMFAILED" {
+					failedIndices = append(failedIndices, i)
+				}
 			}
 
-			stream := false
-			err := client.Chat(context.Background(), &api.ChatRequest{
-				Model:    config.AI.Model,
-				Messages: messages,
-				Stream:   &stream,
-			}, resp)
-
-			if err != nil {
-				fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to process file %s: %v", file.Name, err))
-				continue
+			if len(failedIndices) == 0 {
+				break
 			}
 
-			file.NewName = newName
+			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Retry attempt %d/%d for %d files",
+				retryAttempt+1, retries, len(failedIndices)))
+
+			retryResults := make(chan Result, len(failedIndices))
+
+			// Process failed files
+			for _, i := range failedIndices {
+				sem <- struct{}{}
+				wg.Add(1)
+				go func(index int, file *contentprocessors.File) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					doAIOllama(index, file, query, client, retryResults, config)
+				}(i, &folder.FileList[i])
+			}
+
+			// Collect retry results
+			for range failedIndices {
+				res := <-retryResults
+				mu.Lock()
+				folder.FileList[res.index].NewName = res.name
+				mu.Unlock()
+			}
+		}
+
+		// Process subfolders recursively
+		for i := range folder.SubFolders {
+			if err := processFolder(&folder.SubFolders[i]); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	// Process all root folders
+	for i := range query.Folders {
+		if err := processFolder(&query.Folders[i]); err != nil {
+			return contentprocessors.Query{}, err
 		}
 	}
 
+	wg.Wait()
 	return query, nil
+
 }
 
 func removeThink(s string) string {
@@ -156,4 +201,68 @@ func createMessage(file contentprocessors.File, vision bool, prompt string, cont
 			Content: context,
 		},
 	}
+}
+
+func doAIOllama(j int, file *contentprocessors.File, query contentprocessors.Query, client *api.Client, results chan Result, config configutils.Config) {
+	prompt := config.AI.Prompt
+	if prompt == "" {
+		prompt = query.Prompt
+		if prompt == "" {
+			fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("No prompt provided, using default prompt"))
+			prompt = "What is the name of this document? Only respond with the name and the extension of the file in snake case. Do not respond with anything else!"
+		}
+	}
+
+	messages := createMessage(*file, fileutils.IsImageFile(file.Path), prompt, file.Context)
+	if len(messages) == 0 {
+		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to create message for file %s", file.Name))
+		results <- Result{j, "", fmt.Errorf("failed to create message for file %s", file.Name)}
+		return
+	}
+
+	var newName string
+	response := func(response api.ChatResponse) error {
+		newName = removeThink(response.Message.Content)
+		newName = fileutils.CheckAndAddExtension(newName, file.Name)
+		return nil
+	}
+
+	stream := false
+	err := client.Chat(context.Background(), &api.ChatRequest{
+		Model:    config.AI.Model,
+		Messages: messages,
+		Stream:   &stream,
+	}, response)
+
+	if err != nil {
+		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to process file %s: %v", file.Name, err))
+		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		return
+	}
+
+	if newName == "" {
+		results <- Result{j, "", fmt.Errorf("empty response from AI")}
+		return
+	}
+
+	refinedName := fileutils.RefinedName(newName)
+
+	// check if the response is valid
+	isValid, reason := fileutils.IsAValidFileName(refinedName)
+
+	if !isValid {
+		file.Context = "This is a retry for this file because it failed file validation last time for the reason: " + reason + "\n" + "Please check the file context and try again." + file.Context
+		results <- Result{j, "NOMNOMFAILED", fmt.Errorf("invalid response from AI: %s", reason)}
+		return
+	}
+
+	newName = utils.ConvertCase(refinedName, "snake", config.Case)
+
+	// Remove new lines and spaces from the new name
+	newName = strings.ReplaceAll(newName, "\n", "")
+	newName = strings.ReplaceAll(newName, " ", "")
+	newName = fileutils.CheckAndAddExtension(newName, file.Name)
+
+	results <- Result{j, newName, nil}
+
 }
