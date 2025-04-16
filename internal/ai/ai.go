@@ -26,7 +26,7 @@ type QueryOpts struct {
 	Temperature float64
 }
 
-type result struct {
+type Result struct {
 	index int
 	name  string
 	err   error
@@ -140,7 +140,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 	processFolder = func(folder *contentprocessors.FolderType) error {
 		// Create channels for the current folder's processing
 		sem := make(chan struct{}, workers)
-		results := make(chan result, len(folder.FileList))
+		results := make(chan Result, len(folder.FileList))
 
 		// Process files in current folder
 		for j := range folder.FileList {
@@ -187,7 +187,7 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Retry attempt %d/%d for %d files",
 				retryAttempt+1, retries, len(failedIndices)))
 
-			retryResults := make(chan result, len(failedIndices))
+			retryResults := make(chan Result, len(failedIndices))
 
 			// Process failed files
 			for _, i := range failedIndices {
@@ -230,10 +230,10 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 	return nil
 }
 
-func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
+func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
 	// Create a chat completion request
 	if query.Prompt == "" {
-		results <- result{j, "", fmt.Errorf("no prompt provided")}
+		results <- Result{j, "", fmt.Errorf("no prompt provided")}
 		return
 	}
 	request := &deepseek.ChatCompletionRequest{
@@ -248,12 +248,12 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 	ctx := context.Background()
 	response, err := client.CreateChatCompletion(ctx, request)
 	if err != nil {
-		results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
 		return
 	}
 
 	if response.Choices[0].Message.Content == "" {
-		results <- result{j, "", fmt.Errorf("empty response from AI")}
+		results <- Result{j, "", fmt.Errorf("empty response from AI")}
 		return
 	}
 
@@ -264,7 +264,7 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 
 	if !isValid {
 		file.Context = "This is a retry for this file because it failed file validation last time for the reason: " + reason + "\n" + "Please check the file context and try again." + file.Context
-		results <- result{j, "NOMNOMFAILED", fmt.Errorf("invalid response from AI: %s", reason)}
+		results <- Result{j, "NOMNOMFAILED", fmt.Errorf("invalid response from AI: %s", reason)}
 		return
 	}
 
@@ -275,18 +275,18 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 	newName = strings.ReplaceAll(newName, " ", "")
 	newName = fileutils.CheckAndAddExtension(newName, file.Name)
 
-	results <- result{j, newName, nil}
+	results <- Result{j, newName, nil}
 }
 
-func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan result) {
+func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
 	if query.Prompt == "" {
-		results <- result{j, "", fmt.Errorf("no prompt provided")}
+		results <- Result{j, "", fmt.Errorf("no prompt provided")}
 		return
 	}
 
 	base64Image, err := deepseek.ImageToBase64(file.Path)
 	if err != nil {
-		results <- result{j, "", fmt.Errorf("error opening image file: %v", err)}
+		results <- Result{j, "", fmt.Errorf("error opening image file: %v", err)}
 		return
 	}
 	request := &deepseek.ChatCompletionRequestWithImage{
@@ -302,13 +302,13 @@ func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query conte
 	response, err := client.CreateChatCompletionWithImage(ctx, request)
 	if err != nil {
 		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
-		results <- result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
 		return
 	}
 
 	if response.Choices[0].Message.Content == "" {
 		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
-		results <- result{j, "", fmt.Errorf("empty response from AI")}
+		results <- Result{j, "", fmt.Errorf("empty response from AI")}
 		return
 	}
 
@@ -320,5 +320,5 @@ func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query conte
 	newName = strings.ReplaceAll(newName, " ", "")
 	newName = fileutils.CheckAndAddExtension(newName, file.Name)
 
-	results <- result{j, newName, nil}
+	results <- Result{j, newName, nil}
 }
