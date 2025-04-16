@@ -37,6 +37,13 @@ func TestSendQueryWithOllama(t *testing.T) {
 				Enabled: true,
 			},
 		},
+		Performance: configutils.PerformanceConfig{
+			AI: configutils.PerformanceAIConfig{
+				Workers: 4,
+				Timeout: "30",
+				Retries: 3,
+			},
+		},
 	}
 
 	// Create a test query with sample data
