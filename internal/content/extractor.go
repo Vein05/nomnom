@@ -21,30 +21,50 @@ const (
 	GB = 1024 * MB
 )
 
+// FolderType represents a directory structure containing files and subfolders with:
 type FolderType struct {
-	Name       string       `json:"name,omitempty"`
-	FileList   []File       `json:"file_list,omitempty"`
-	FolderPath string       `json:"folder_path,omitempty"`
+	// Name is the name of the folder
+	Name string `json:"name,omitempty"`
+	// FileList contains all files in the current folder
+	FileList []File `json:"file_list,omitempty"`
+	// FolderPath stores the absolute path to this folder
+	FolderPath string `json:"folder_path,omitempty"`
+	// SubFolders contains all nested folders within this folder
 	SubFolders []FolderType `json:"sub_folders,omitempty"`
 }
 
+// File represents a single file in the system with metadata and processing info
 type File struct {
+	// UNCHANGEDPATH stores the original path that should not be modified
 	UNCHANGEDPATH string `json:"unchanged_path,omitempty"`
-	Name          string `json:"name,omitempty"`
-	NewName       string `json:"new_name,omitempty"`
-	Path          string `json:"path,omitempty"`
-	Context       string `json:"context,omitempty"`
-	Size          int64  `json:"size,omitempty"`
+	// Name is the current filename
+	Name string `json:"name,omitempty"`
+	// NewName stores the processed/renamed filename
+	NewName string `json:"new_name,omitempty"`
+	// Path contains the full path to the file
+	Path string `json:"path,omitempty"`
+	// Context stores additional contextual information about the file
+	Context string `json:"context,omitempty"`
+	// Size represents the file size in bytes
+	Size int64 `json:"size,omitempty"`
+	// FormattedSize is the human-readable file size (e.g., "1.5 MB")
 	FormattedSize string `json:"formatted_size,omitempty"`
-	FailedReason  string `json:"failed_reason,omitempty"`
+	// FailedReason contains error description if processing failed
+	FailedReason string `json:"failed_reason,omitempty"`
 }
 
+// result represents the outcome of a file processing operation
 type result struct {
-	File    File
-	Err     error
-	Workers int    `json:"workers,omitempty"`
+	// File contains the processed file information
+	File File
+	// Err holds any error that occurred during processing
+	Err error
+	// Workers specifies the number of concurrent workers used
+	Workers int `json:"workers,omitempty"`
+	// Timeout specifies the processing time limit
 	Timeout string `json:"timeout,omitempty"`
-	Retries int    `json:"retries,omitempty"`
+	// Retries indicates the number of retry attempts made
+	Retries int `json:"retries,omitempty"`
 }
 
 func formatFileSize(size int64) string {
