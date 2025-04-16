@@ -38,3 +38,5 @@ demo/
 
 # ignore the build file 
 nomnom
+windows.sh
+*.zip
