@@ -30,6 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install MinGW for Windows
+        if: matrix.os == 'windows'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -40,6 +46,8 @@ jobs:
           CGO_ENABLED: ${{ matrix.os == 'windows' && '1' || '0' }}
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          # Use MinGW for Windows builds
+          CC: ${{ matrix.os == 'windows' && 'x86_64-w64-mingw32-gcc' || 'gcc' }}
         run: |
           go build -v -ldflags "-X main.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
           zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
