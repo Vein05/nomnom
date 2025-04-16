@@ -23,7 +23,7 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 		fmt.Printf("%s %s\n", color.RedString("▶ "), color.RedString("You're using OpenRouter without a model. Nomnom will be using: %s", model))
 	}
 	opts := QueryOpts{
-		Model: config.AI.Model,
+		Model: model,
 		Case:  config.Case,
 	}
 
