@@ -27,10 +27,6 @@ jobs:
             arch: arm64
             extension: ""
             cgo: "0"
-          - os: windows
-            arch: amd64
-            extension: ".exe"
-            cgo: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -40,18 +36,11 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Install MinGW (Windows CGO support)
-        if: matrix.os == 'windows' && matrix.cgo == '1'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64
-
       - name: Build Binary
         env:
           CGO_ENABLED: ${{ matrix.cgo }}
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
-          CC: x86_64-w64-mingw32-gcc
         run: |
           go build -v -ldflags "-X main.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
           zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
