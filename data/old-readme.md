@@ -49,12 +49,12 @@
   - Text files
   - Documents (PDF, DOCX) - First 2 pages analyzed for context
   - Presentations
-  - Images Vision (Visit [0.5.0](data/old-readme.md) for tessaract support)
+  - Images (metadata and OCR text extraction) or Vision
   - Videos (metadata)
 - 🤖 **AI-Powered**: Multiple AI provider options:
   - DeepSeek V3/R1 model
   - OpenRouter support (access to Claude, GPT-4, and more)
-  - Local execution via Ollama (No parallel processing)
+  - Local execution via Ollama
 - 👀 **Preview Mode**: Review generated names before applying changes
 - 🎯 **Flexible Naming**: Supports different casing options (snake_case, camelCase, kebab, pascal.)
 - 🔒 **Safe Operations**: Creates a separate directory for renamed files
@@ -70,32 +70,38 @@
 
 
 ### Things to know
-1. You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
-    ```bash
-    # For DeepSeek
-    export DEEPSEEK_API_KEY="your-deepseek-api-key"
+- You necessarily don't need put your API keys in the config file. If you leave `api-key=""`, and export your API keys as the following, nomnom should pick it up:
+  ```bash
+  # For DeepSeek
+  export DEEPSEEK_API_KEY="your-deepseek-api-key"
 
-    # For OpenRouter
-    export OPENROUTER_API_KEY="your-openrouter-api-key"
-    ```
+  # For OpenRouter
+  export OPENROUTER_API_KEY="your-openrouter-api-key"
+  ```
 
-    - **NomNom will automatically detect and use these environment variables if no API keys are specified(but the providers are) in the config file.** 
-    If no provider is set, it will revert to deepseek and possibly use the `DEEPSEEK_API_KEY` env variable. 
-
-2. Please use a vision model if you are dealing with images. There are some great vision models for cheap:
-    - google/gemini-2.0-flash-001
-    - meta-llama/llama-4-scout
-
-3. If you're using OpenRouter but leave the model empty in config, Nomnom will use `model = "meta-llama/llama-4-scout:free"`. 
-
+**NomNom will automatically detect and use these environment variables if no API keys are specified(but the providers are) in the config file.** 
+If no provider is set, it will revert to deepseek and possibly use the `DEEPSEEK_API_KEY` env variable. 
 ## Installation
+
+### Requirements
+Install Tesseract OCR:
+   - macOS: 
+     ```bash
+     brew install tesseract
+
+     #if you receive the leptonica/allheaders.h: No such file or directory: try this following
+     export LIBRARY_PATH="/opt/homebrew/lib"
+     export CPATH="/opt/homebrew/include"
+     ```
+   - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+   - Windows: Download installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
 
 ### MacOS/Linux
 Clone and install NomNom:
 
 ```bash
 # Clone the repository
-git clone https://github.com/vein05/nomnom.git
+git clone --branch 0.5.0 https://github.com/Vein05/nomnom.git
 cd nomnom
 
 # Make it executable
@@ -464,6 +470,7 @@ go test ./internal/files
 - DEEPSEEK_API_KEY environment variable for DeepSeek tests
 - OPENROUTER_API_KEY environment variable for OpenRouter tests
 - Ollama running locally for Ollama tests
+- Tesseract OCR installed for image processing tests
 
 #### Test Coverage
 The test suite covers:

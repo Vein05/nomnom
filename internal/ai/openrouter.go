@@ -8,6 +8,7 @@ import (
 	configutils "nomnom/internal/utils"
 
 	deepseek "github.com/cohesion-org/deepseek-go"
+	"github.com/fatih/color"
 )
 
 // SendQueryWithOpenRouter sends a query to the OpenRouter API to generate new file names
@@ -16,13 +17,30 @@ func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.
 	baseURL := "https://openrouter.ai/api/v1/"
 	client := deepseek.NewClient(os.Getenv("OPENROUTER_API_KEY"), baseURL)
 
+	model := config.AI.Model
+	if model == "" {
+		model = "meta-llama/llama-4-scout:free"
+		fmt.Printf("%s %s\n", color.RedString("▶ "), color.RedString("You're using OpenRouter without a model. Nomnom will be using: %s", model))
+	}
 	opts := QueryOpts{
-		Model: config.AI.Model,
+		Model: model,
 		Case:  config.Case,
 	}
 
+	// check if config.ai.max_tokens is set
+	if config.AI.MaxTokens != 0 {
+		opts.MaxTokens = config.AI.MaxTokens
+	}
+
+	// check if config.ai.temperature is set
+	if config.AI.Temperature != 0 {
+		opts.Temperature = config.AI.Temperature
+	}
+
+	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("You're using OpenRouter with model: %s", model))
+
 	if err := SendQueryToLLM(client, query, opts); err != nil {
-		fmt.Printf("❌ Failed to process query with OpenRouter: %v", err)
+		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to process query with OpenRouter: %v", err))
 		return contentprocessors.Query{}, err
 	}
 	return query, nil
