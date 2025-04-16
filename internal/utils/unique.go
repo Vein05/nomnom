@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// GenerateUniqueFilename generates a unique filename by appending a counter to the base name.
 func GenerateUniqueFilename(s string) string {
 	parts := strings.Split(s, ".")
 	baseName := parts[0]
