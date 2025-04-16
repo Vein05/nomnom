@@ -32,6 +32,9 @@ internal/content/demo
 demo/
 .nomnom/logs/
 
-// ignore all video files
+# ignore all video files
 *.mp4
 *.gif
+
+# ignore the build file 
+nomnom
