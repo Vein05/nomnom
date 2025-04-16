@@ -90,6 +90,26 @@
 
 ## Installation
 
+### Option 1: Pre-built Binaries (Recommended)
+1. Download the latest release for your system from the [Releases page](https://github.com/vein05/nomnom/releases/latest)
+2. Extract the ZIP file
+3. Move the binary to your PATH:
+
+    **MacOS/Linux:**
+    ```bash
+    chmod +x ./nomnom
+    sudo mv ./nomnom /usr/local/bin/
+    ```
+
+    **Windows:**
+      - Move `nomnom.exe` to a directory in your PATH
+      - Or run: 
+        ```bash
+        Copy-Item -Path "nomnom.exe" -Destination "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps"
+        ```
+
+### Option 2: Build from Source
+
 ### MacOS/Linux
 Clone and install NomNom:
 
@@ -97,6 +117,8 @@ Clone and install NomNom:
 # Clone the repository
 git clone https://github.com/vein05/nomnom.git
 cd nomnom
+
+go build . 
 
 # Make it executable
 chmod +x ./nomnom
