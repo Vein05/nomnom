@@ -4,7 +4,7 @@
   "ai": {
     "api_key": "",
     "provider": "openrouter",
-    "model": "google/gemini-2.0-flash-lite-001",
+    "model": "",
     "vision" : {
       "enabled": false,
       "max_image_size": "10MB"
