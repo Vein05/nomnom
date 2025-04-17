@@ -6,7 +6,7 @@
     "provider": "openrouter",
     "model": "",
     "vision" : {
-      "enabled": false,
+      "enabled": true,
       "max_image_size": "10MB"
     },
     "max_tokens": 1000,
