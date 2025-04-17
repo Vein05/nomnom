@@ -34,6 +34,11 @@ type Result struct {
 
 // HandleAI is a function that handles the AI model selection and query execution and returns the result.
 func HandleAI(config utils.Config, query contentprocessors.Query) (contentprocessors.Query, error) {
+	// Check if config.AI is empty
+	if config.AI == (utils.AIConfig{}) {
+		return contentprocessors.Query{}, fmt.Errorf("AI configuration is empty")
+	}
+
 	// Select the AI model based on the config
 	var aiModel string
 
@@ -111,6 +116,16 @@ func HandleAI(config utils.Config, query contentprocessors.Query) (contentproces
 
 // SendQueryToLLM sends a query to an LLM API to generate new file names
 func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts QueryOpts) error {
+	// Check if client is nil
+	if client == nil {
+		return fmt.Errorf("nil client")
+	}
+
+	// Check if query.Folders is nil
+	if query.Folders == nil {
+		return fmt.Errorf("no folders to process")
+	}
+
 	// load config
 	config := utils.LoadConfig(query.ConfigPath, color.WhiteString("▶  "))
 	performanceOpts := config.Performance.AI
@@ -138,6 +153,19 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 	// Create a recursive function to process folders
 	var processFolder func(folder *contentprocessors.FolderType) error
 	processFolder = func(folder *contentprocessors.FolderType) error {
+		// Check if folder is nil
+		if folder == nil {
+			return fmt.Errorf("nil folder pointer")
+		}
+
+		// Initialize FileList and SubFolders if nil
+		if folder.FileList == nil {
+			folder.FileList = []contentprocessors.File{}
+		}
+		if folder.SubFolders == nil {
+			folder.SubFolders = []contentprocessors.FolderType{}
+		}
+
 		// Create channels for the current folder's processing
 		sem := make(chan struct{}, workers)
 		results := make(chan Result, len(folder.FileList))
@@ -231,6 +259,16 @@ func SendQueryToLLM(client *deepseek.Client, query contentprocessors.Query, opts
 }
 
 func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
+	// Check if file or client is nil
+	if file == nil {
+		results <- Result{j, "", fmt.Errorf("nil file pointer")}
+		return
+	}
+	if client == nil {
+		results <- Result{j, "", fmt.Errorf("nil client")}
+		return
+	}
+
 	// Create a chat completion request
 	if query.Prompt == "" {
 		results <- Result{j, "", fmt.Errorf("no prompt provided")}
@@ -249,6 +287,12 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 	response, err := client.CreateChatCompletion(ctx, request)
 	if err != nil {
 		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		return
+	}
+
+	// Check if response.Choices is valid
+	if response.Choices == nil || len(response.Choices) == 0 {
+		results <- Result{j, "", fmt.Errorf("no choices in AI response")}
 		return
 	}
 
@@ -279,6 +323,16 @@ func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentproc
 }
 
 func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
+	// Check if file or client is nil
+	if file == nil {
+		results <- Result{j, "", fmt.Errorf("nil file pointer")}
+		return
+	}
+	if client == nil {
+		results <- Result{j, "", fmt.Errorf("nil client")}
+		return
+	}
+
 	if query.Prompt == "" {
 		results <- Result{j, "", fmt.Errorf("no prompt provided")}
 		return
@@ -303,6 +357,13 @@ func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query conte
 	if err != nil {
 		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
 		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
+		return
+	}
+
+	// Check if response.Choices is valid
+	if response.Choices == nil || len(response.Choices) == 0 {
+		fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Error creating chat completion for %s: will get added to retry!", file.Name))
+		results <- Result{j, "", fmt.Errorf("no choices in AI response")}
 		return
 	}
 
