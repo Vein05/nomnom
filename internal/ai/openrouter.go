@@ -2,7 +2,6 @@ package nomnom
 
 import (
 	"fmt"
-	"os"
 
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
@@ -15,7 +14,15 @@ import (
 func SendQueryWithOpenRouter(config configutils.Config, query contentprocessors.Query) (result contentprocessors.Query, err error) {
 	// Set up the client with OpenRouter base URL
 	baseURL := "https://openrouter.ai/api/v1/"
-	client := deepseek.NewClient(os.Getenv("OPENROUTER_API_KEY"), baseURL)
+
+	var key string
+	if config.AI.APIKey != "" {
+		key = config.AI.APIKey
+	} else {
+		return contentprocessors.Query{}, fmt.Errorf("no API key provided for OpenRouter")
+	}
+
+	client := deepseek.NewClient(key, baseURL)
 
 	model := config.AI.Model
 	if model == "" {

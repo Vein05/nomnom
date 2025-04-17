@@ -16,8 +16,14 @@ func SendQueryWithDeepSeek(config configutils.Config, query contentprocessors.Qu
 	// Set up the Deepseek client
 
 	// check if config.ai.apikey is set
+	var key string
+	if config.AI.APIKey != "" {
+		key = config.AI.APIKey
+	} else {
+		return contentprocessors.Query{}, fmt.Errorf("no API key provided for Deepseek")
+	}
 
-	client := deepseek.NewClient(config.AI.APIKey)
+	client := deepseek.NewClient(key)
 	model := config.AI.Model
 	if model == "" {
 		model = deepseek.DeepSeekChat
