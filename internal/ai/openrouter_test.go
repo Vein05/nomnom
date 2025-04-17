@@ -58,3 +58,15 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 		fmt.Printf("File %d - Old Name: %s, New Name: %s\n", i+1, file.Name, file.NewName)
 	}
 }
+
+func TestSendQueryWithOpenRouterNoKey(t *testing.T) {
+	config := configutils.LoadConfig("", "")
+	if config.AI.APIKey != "" {
+		t.Logf("API key is set, good to go")
+	}
+	_, err := SendQueryWithOpenRouter(config, contentprocessors.Query{})
+	if err == nil {
+		t.Errorf("Expected error when no API key is provided, got nil")
+	}
+
+}
