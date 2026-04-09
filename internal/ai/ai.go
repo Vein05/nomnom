@@ -3,395 +3,277 @@ package ai
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
-	contentprocessors "nomnom/internal/content"
-	"os"
-	"strings"
-
+	content "nomnom/internal/content"
 	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 
 	deepseek "github.com/cohesion-org/deepseek-go"
 )
 
-// QueryOpts contains options for the query
 type QueryOpts struct {
+	Provider    string
 	Model       string
 	Case        string
 	MaxTokens   int
 	Temperature float64
 }
 
-type Result struct {
-	index int
-	name  string
-	err   error
-}
-
-// HandleAI is a function that handles the AI model selection and query execution and returns the result.
-func HandleAI(config utils.Config, query contentprocessors.Query) (contentprocessors.Query, error) {
+func HandleAI(config utils.Config, query content.Query) (content.Query, error) {
 	reporter := reporterFor(query)
-	// Check if config.AI is empty
 	if config.AI == (utils.AIConfig{}) {
-		return contentprocessors.Query{}, fmt.Errorf("AI configuration is empty")
+		return content.Query{}, fmt.Errorf("AI configuration is empty")
 	}
 
-	// Select the AI model based on the config
-	var aiModel string
-
-	// we first check if the provider is set, if not we default to deepseek
-	// we currently check if we are serving deepseek, ollama or openrouter
-	if config.AI.Provider != "" {
-		if config.AI.Provider == "deepseek" {
-			reporter.Infof("Using deepseek as AI provider")
-			aiModel = "deepseek"
-		} else if config.AI.Provider == "ollama" {
-			reporter.Infof("Using ollama as AI provider")
-			aiModel = "ollama"
-		} else if config.AI.Provider == "openrouter" {
-			reporter.Infof("Using openrouter as AI provider")
-			aiModel = "openrouter"
-		} else {
-			reporter.Errorf("Invalid AI provider: %s", config.AI.Provider)
-			return contentprocessors.Query{}, fmt.Errorf("invalid AI provider: %s", config.AI.Provider)
-		}
-	} else {
-		aiModel = "deepseek"
+	provider := config.AI.Provider
+	if provider == "" {
+		provider = "deepseek"
 		reporter.Infof("No AI provider set, defaulting to deepseek")
 	}
+	if provider != "deepseek" && provider != "openrouter" && provider != "ollama" {
+		return content.Query{}, fmt.Errorf("invalid AI provider: %s", provider)
+	}
 
-	// now we check if have an api key for the provider, if not let the user know and default to env variable
-	// we skip ollama as it does not require an api key
-	if aiModel != "ollama" {
-		if config.AI.APIKey == "" {
-			reporter.Warnf("No API key set for AI provider, checking environment variables")
-			// we check if the api key is set in the environment variables
-			if os.Getenv("DEEPSEEK_API_KEY") != "" && (aiModel == "deepseek" || aiModel == "") {
-				reporter.Infof("Found deepseek API key in environment variable")
-				config.AI.APIKey = os.Getenv("DEEPSEEK_API_KEY")
-				aiModel = "deepseek"
-			} else if os.Getenv("OPENROUTER_API_KEY") != "" && (aiModel == "openrouter" || aiModel == "") {
-				reporter.Infof("Found openrouter API key in environment variable")
-				config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
-				aiModel = "openrouter"
-			} else {
-				reporter.Errorf("No API key found for %s provider", aiModel)
-				return contentprocessors.Query{}, fmt.Errorf("no API key found for provider %s", aiModel)
-			}
+	if provider != "ollama" && config.AI.APIKey == "" {
+		switch provider {
+		case "deepseek":
+			config.AI.APIKey = os.Getenv("DEEPSEEK_API_KEY")
+		case "openrouter":
+			config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
 		}
 	}
 
-	// for testing purposes, if the key is "dummy-key", just return a dummy query
+	if provider != "ollama" && config.AI.APIKey == "" {
+		return content.Query{}, fmt.Errorf("no API key found for provider %s", provider)
+	}
+
 	if config.AI.APIKey == "dummy-key" {
-		return contentprocessors.Query{}, nil
+		return query, nil
 	}
 
-	// now we switch on the ai model and call the appropriate function
-	switch aiModel {
+	switch provider {
 	case "deepseek":
-		query, err := SendQueryWithDeepSeek(config, query)
-		if err != nil {
-			return contentprocessors.Query{}, err
-		}
-		return query, nil
+		return SendQueryWithDeepSeek(config, query)
 	case "ollama":
-		query, err := SendQueryWithOllama(config, query)
-		if err != nil {
-			return contentprocessors.Query{}, err
-		}
-		return query, nil
+		return SendQueryWithOllama(config, query)
 	case "openrouter":
-		query, err := SendQueryWithOpenRouter(config, query)
-		if err != nil {
-			return contentprocessors.Query{}, err
-		}
-		return query, nil
+		return SendQueryWithOpenRouter(config, query)
+	default:
+		return content.Query{}, fmt.Errorf("invalid AI provider: %s", provider)
 	}
-
-	return contentprocessors.Query{}, fmt.Errorf("invalid AI model: %s", aiModel)
 }
 
-// SendQueryToLLM sends a query to an LLM API to generate new file names
-func SendQueryToLLM(client *deepseek.Client, config utils.Config, query contentprocessors.Query, opts QueryOpts) error {
-	reporter := reporterFor(query)
-	// Check if client is nil
+func SendQueryToLLM(client *deepseek.Client, config utils.Config, query content.Query, opts QueryOpts) error {
 	if client == nil {
 		return fmt.Errorf("nil client")
 	}
-
-	// Check if query.Folders is nil
-	if query.Folders == nil {
-		return fmt.Errorf("no folders to process")
+	if len(query.Scan.Files) == 0 {
+		return fmt.Errorf("no files to process")
 	}
 
-	performanceOpts := config.Performance.AI
-	workers := performanceOpts.Workers
-	timeout := performanceOpts.Timeout
-	retries := performanceOpts.Retries
+	workers, retries, timeout, err := aiRuntime(config)
+	if err != nil {
+		return err
+	}
 
+	client.Timeout = timeout
+	reporter := reporterFor(query)
+	reporter.Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d", workers, timeout, retries)
+
+	plan := buildRenamePlan(query.Scan.Files, workers, retries, reporter, func(file content.ScannedFile, retryHint string) (string, error) {
+		if config.AI.Vision.Enabled && hasVisionSource(file) {
+			return requestVisionName(client, query.Prompt, file, retryHint, opts, query.Analytics)
+		}
+		return requestTextName(client, query.Prompt, file, retryHint, opts, query.Analytics)
+	})
+
+	query.Plan = plan
+	return nil
+}
+
+func aiRuntime(config utils.Config) (workers int, retries int, timeout time.Duration, err error) {
+	workers = config.Performance.AI.Workers
 	if workers == 0 {
 		workers = 1
 	}
-	if timeout == "" {
-		timeout = "30s"
-	}
+
+	retries = config.Performance.AI.Retries
 	if retries == 0 {
 		retries = 1
 	}
 
-	reporter.Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d", workers, timeout, retries)
+	timeoutRaw := config.Performance.AI.Timeout
+	if timeoutRaw == "" {
+		timeoutRaw = "30s"
+	}
 
-	parsedTimeout, err := time.ParseDuration(timeout)
+	timeout, err = time.ParseDuration(timeoutRaw)
 	if err != nil {
-		reporter.Errorf("Failed to parse timeout: %v", err)
-		return err
+		return 0, 0, 0, fmt.Errorf("failed to parse timeout: %w", err)
 	}
 
-	client.Timeout = parsedTimeout
+	return workers, retries, timeout, nil
+}
 
-	if config.AI.Vision.Enabled {
-		reporter.Warnf("You're using vision mode, make sure the model is multimodal")
-	}
+func buildRenamePlan(files []content.ScannedFile, workers, retries int, reporter utils.Reporter, nameFunc func(content.ScannedFile, string) (string, error)) []content.RenamePlanEntry {
+	results := make([]content.RenamePlanEntry, len(files))
+	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	// Create a recursive function to process folders
-	var processFolder func(folder *contentprocessors.FolderType) error
-	processFolder = func(folder *contentprocessors.FolderType) error {
-		// Check if folder is nil
-		if folder == nil {
-			return fmt.Errorf("nil folder pointer")
-		}
+	for index, file := range files {
+		index := index
+		file := file
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		// Initialize FileList and SubFolders if nil
-		if folder.FileList == nil {
-			folder.FileList = []contentprocessors.File{}
-		}
-		if folder.SubFolders == nil {
-			folder.SubFolders = []contentprocessors.FolderType{}
-		}
-
-		// Create channels for the current folder's processing
-		sem := make(chan struct{}, workers)
-		results := make(chan Result, len(folder.FileList))
-
-		// Process files in current folder
-		for j := range folder.FileList {
-			sem <- struct{}{} // Acquire worker slot
-			wg.Add(1)
-			go func(j int, file *contentprocessors.File) {
-				defer wg.Done()
-				defer func() { <-sem }()                                          // Release worker slot
-				if config.AI.Vision.Enabled && fileutils.IsImageFile(file.Path) { // Note: Trust the user to set the right config
-					doVisionAI(j, file, opts, query, client, results) // Note: We don't have any checks for failures here because our failure is handled in our retry logic with defaults to doAI()
-				} else {
-					doAI(j, file, opts, query, client, results)
-				}
-			}(j, &folder.FileList[j])
-		}
-
-		// Collect results for current folder's files
-		for range folder.FileList {
-			res := <-results
-			if res.err != nil {
-				reporter.Errorf("Failed to process file: %s. Error: %v", folder.FileList[res.index].Name, res.err)
-				folder.FileList[res.index].NewName = res.name
-				continue
+			results[index] = content.RenamePlanEntry{
+				File:          file,
+				SuggestedName: nameWithRetry(file, retries, reporter, nameFunc),
 			}
-			folder.FileList[res.index].NewName = res.name
-		}
-
-		// Handle retries for failed files in current folder
-		for retryAttempt := 0; retryAttempt < retries; retryAttempt++ {
-			failedIndices := []int{}
-
-			// Identify failed files
-			for i, file := range folder.FileList {
-				if file.NewName == "NOMNOMFAILED" {
-					failedIndices = append(failedIndices, i)
-				}
-			}
-
-			if len(failedIndices) == 0 {
-				break
-			}
-
-			reporter.Warnf("Retry attempt %d/%d for %d files", retryAttempt+1, retries, len(failedIndices))
-
-			retryResults := make(chan Result, len(failedIndices))
-
-			// Process failed files
-			for _, i := range failedIndices {
-				sem <- struct{}{}
-				wg.Add(1)
-				go func(index int, file *contentprocessors.File) {
-					defer wg.Done()
-					defer func() { <-sem }()
-					doAI(index, file, opts, query, client, retryResults)
-				}(i, &folder.FileList[i])
-			}
-
-			// Collect retry results
-			for range failedIndices {
-				res := <-retryResults
-				mu.Lock()
-				folder.FileList[res.index].NewName = res.name
-				mu.Unlock()
-			}
-		}
-
-		// Process subfolders recursively
-		for i := range folder.SubFolders {
-			if err := processFolder(&folder.SubFolders[i]); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	// Process all root folders
-	for i := range query.Folders {
-		if err := processFolder(&query.Folders[i]); err != nil {
-			return err
-		}
+		}()
 	}
 
 	wg.Wait()
-	return nil
+	return results
 }
 
-func doAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
-	// Check if file or client is nil
-	if file == nil {
-		results <- Result{j, "", fmt.Errorf("nil file pointer")}
-		return
-	}
-	if client == nil {
-		results <- Result{j, "", fmt.Errorf("nil client")}
-		return
+func nameWithRetry(file content.ScannedFile, retries int, reporter utils.Reporter, nameFunc func(content.ScannedFile, string) (string, error)) string {
+	retryHint := ""
+	var lastErr error
+
+	for attempt := 0; attempt <= retries; attempt++ {
+		name, err := nameFunc(file, retryHint)
+		if err == nil {
+			return name
+		}
+
+		lastErr = err
+		retryHint = retryReason(err)
+		if attempt < retries {
+			reporter.Warnf("Retry attempt %d/%d for %s", attempt+1, retries, file.OriginalName)
+		}
 	}
 
-	// Create a chat completion request
-	if query.Prompt == "" {
-		results <- Result{j, "", fmt.Errorf("no prompt provided")}
-		return
-	}
+	reporter.Errorf("Failed to process file: %s. Error: %v", file.OriginalName, lastErr)
+	return ""
+}
+
+func requestTextName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, analytics *utils.AnalyticsStore) (string, error) {
 	request := &deepseek.ChatCompletionRequest{
 		Model: opts.Model,
 		Messages: []deepseek.ChatCompletionMessage{
-			{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
-			{Role: deepseek.ChatMessageRoleUser, Content: file.Context},
+			{Role: deepseek.ChatMessageRoleSystem, Content: prompt},
+			{Role: deepseek.ChatMessageRoleUser, Content: promptContext(file, retryHint)},
 		},
 	}
 
-	// Send the request and handle the response
-	ctx := context.Background()
-	response, err := client.CreateChatCompletion(ctx, request)
+	response, err := client.CreateChatCompletion(context.Background(), request)
 	if err != nil {
-		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
-		return
+		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
-
-	// Check if response.Choices is valid
 	if response.Choices == nil || len(response.Choices) == 0 {
-		results <- Result{j, "", fmt.Errorf("no choices in AI response")}
-		return
+		return "", fmt.Errorf("no choices in AI response")
 	}
-
-	if response.Choices[0].Message.Content == "" {
-		results <- Result{j, "", fmt.Errorf("empty response from AI")}
-		return
-	}
-
-	refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
-
-	// check if the response is valid
-	isValid, reason := fileutils.IsAValidFileName(refinedName)
-
-	if !isValid {
-		file.Context = "This is a retry for this file because it failed file validation last time for the reason: " + reason + "\n" + "Please check the file context and try again." + file.Context
-		results <- Result{j, "NOMNOMFAILED", fmt.Errorf("invalid response from AI: %s", reason)}
-		return
-	}
-
-	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
-
-	// Remove new lines and spaces from the new name
-	newName = strings.ReplaceAll(newName, "\n", "")
-	newName = strings.ReplaceAll(newName, " ", "")
-	newName = fileutils.CheckAndAddExtension(newName, file.Name)
-
-	results <- Result{j, newName, nil}
+	recordAnalyticsUsage(analytics, opts.Provider, response.Model, response.Usage.PromptTokens, response.Usage.CompletionTokens, response.Usage.TotalTokens, false)
+	return normalizeSuggestedName(response.Choices[0].Message.Content, file, opts.Case)
 }
 
-func doVisionAI(j int, file *contentprocessors.File, opts QueryOpts, query contentprocessors.Query, client *deepseek.Client, results chan Result) {
-	// Check if file or client is nil
-	if file == nil {
-		results <- Result{j, "", fmt.Errorf("nil file pointer")}
-		return
-	}
-	if client == nil {
-		results <- Result{j, "", fmt.Errorf("nil client")}
-		return
-	}
-
-	if query.Prompt == "" {
-		results <- Result{j, "", fmt.Errorf("no prompt provided")}
-		return
-	}
-
-	base64Image, err := deepseek.ImageToBase64(file.Path)
+func requestVisionName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, analytics *utils.AnalyticsStore) (string, error) {
+	base64Image, err := deepseek.ImageToBase64(visionSourcePath(file))
 	if err != nil {
-		results <- Result{j, "", fmt.Errorf("error opening image file: %v", err)}
-		return
+		return "", fmt.Errorf("error opening image file: %w", err)
 	}
+
 	request := &deepseek.ChatCompletionRequestWithImage{
 		Model: opts.Model,
 		Messages: []deepseek.ChatCompletionMessageWithImage{
-			{Role: deepseek.ChatMessageRoleSystem, Content: query.Prompt},
-			deepseek.NewImageMessage("user", file.Context, base64Image),
+			{Role: deepseek.ChatMessageRoleSystem, Content: prompt},
+			deepseek.NewImageMessage("user", promptContext(file, retryHint), base64Image),
 		},
 	}
 
-	// Send the request and handle the response
-	ctx := context.Background()
-	response, err := client.CreateChatCompletionWithImage(ctx, request)
+	response, err := client.CreateChatCompletionWithImage(context.Background(), request)
 	if err != nil {
-		reporterFor(query).Errorf("Error creating chat completion for %s: will get added to retry", file.Name)
-		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
-		return
+		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
-
-	// Check if response.Choices is valid
 	if response.Choices == nil || len(response.Choices) == 0 {
-		reporterFor(query).Errorf("Error creating chat completion for %s: will get added to retry", file.Name)
-		results <- Result{j, "", fmt.Errorf("no choices in AI response")}
-		return
+		return "", fmt.Errorf("no choices in AI response")
 	}
-
-	if response.Choices[0].Message.Content == "" {
-		reporterFor(query).Errorf("Error creating chat completion for %s: will get added to retry", file.Name)
-		results <- Result{j, "", fmt.Errorf("empty response from AI")}
-		return
-	}
-
-	refinedName := fileutils.RefinedName(response.Choices[0].Message.Content)
-
-	newName := utils.ConvertCase(refinedName, "snake", opts.Case)
-
-	newName = strings.ReplaceAll(newName, "\n", "")
-	newName = strings.ReplaceAll(newName, " ", "")
-	newName = fileutils.CheckAndAddExtension(newName, file.Name)
-
-	results <- Result{j, newName, nil}
+	recordAnalyticsUsage(analytics, opts.Provider, response.Model, response.Usage.PromptTokens, response.Usage.CompletionTokens, response.Usage.TotalTokens, true)
+	return normalizeSuggestedName(response.Choices[0].Message.Content, file, opts.Case)
 }
 
-func reporterFor(query contentprocessors.Query) utils.Reporter {
+func normalizeSuggestedName(raw string, file content.ScannedFile, caseStyle string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", fmt.Errorf("empty response from AI")
+	}
+
+	refinedName := fileutils.RefinedName(raw)
+	newName := utils.ConvertCase(refinedName, "snake", caseStyle)
+	newName = strings.ReplaceAll(newName, "\n", "")
+	newName = strings.ReplaceAll(newName, " ", "")
+	newName = fileutils.CheckAndAddExtension(newName, file.OriginalName)
+
+	if isValid, reason := fileutils.IsAValidFileName(newName); !isValid {
+		return "", fmt.Errorf("invalid response from AI: %s", reason)
+	}
+
+	return newName, nil
+}
+
+func promptContext(file content.ScannedFile, retryHint string) string {
+	if retryHint == "" {
+		return file.Context
+	}
+
+	return "Previous filename suggestion failed validation for this reason: " + retryHint + "\nPlease return only a valid filename with the original extension.\n\n" + file.Context
+}
+
+func retryReason(err error) string {
+	message := err.Error()
+	const prefix = "invalid response from AI: "
+	if strings.HasPrefix(message, prefix) {
+		return strings.TrimPrefix(message, prefix)
+	}
+	return ""
+}
+
+func reporterFor(query content.Query) utils.Reporter {
 	if query.Reporter != nil {
 		return query.Reporter
 	}
 	return utils.NopReporter{}
+}
+
+func hasVisionSource(file content.ScannedFile) bool {
+	return file.VisualPath != "" || fileutils.IsImageFile(file.SourcePath)
+}
+
+func visionSourcePath(file content.ScannedFile) string {
+	if file.VisualPath != "" {
+		return file.VisualPath
+	}
+	return file.SourcePath
+}
+
+func recordAnalyticsUsage(analytics *utils.AnalyticsStore, provider, model string, promptTokens, completionTokens, totalTokens int, vision bool) {
+	if analytics == nil {
+		return
+	}
+
+	analytics.RecordAIUsage(utils.AnalyticsUsage{
+		Provider:         provider,
+		Model:            model,
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+		Vision:           vision,
+	})
 }

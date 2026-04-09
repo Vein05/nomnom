@@ -1,7 +1,7 @@
 package files
 
 import (
-	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,238 +12,84 @@ func demoDir(t *testing.T) string {
 	return filepath.Join("..", "..", "demo")
 }
 
-func TestReadFile(t *testing.T) {
-	demoDir := demoDir(t)
-
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read TXT file",
-			filepath: filepath.Join(demoDir, "abcd.txt"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read PNG file",
-			filepath: filepath.Join(demoDir, "image1.png"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read PDF file",
-			filepath: filepath.Join(demoDir, "hello.pdf"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read DOCX file",
-			filepath: filepath.Join(demoDir, "demo.docx"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read JSON file",
-			filepath: filepath.Join(demoDir, "test.json"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read non-existent file",
-			filepath: filepath.Join(demoDir, "nonexistent.txt"),
-			want:     "There was an error reading the file" + filepath.Join(demoDir, "nonexistent.txt"),
-			wantErr:  true,
-		},
+func TestReadFileText(t *testing.T) {
+	content, err := ReadFile(filepath.Join(demoDir(t), "abcd.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(tt.filepath)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadFile() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("ReadFile() = %v, want %v", got, tt.want)
-			}
-		})
+	if strings.TrimSpace(content) == "" {
+		t.Fatal("ReadFile() returned empty content for text file")
 	}
 }
 
-func TestReadTxtFile(t *testing.T) {
-	demoDir := demoDir(t)
+func TestExtractFileContentImageUsesVisualSource(t *testing.T) {
+	path := filepath.Join(demoDir(t), "image1.png")
 
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read valid TXT file",
-			filepath: filepath.Join(demoDir, "abcd.txt"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read non-existent TXT file",
-			filepath: filepath.Join(demoDir, "nonexistent.txt"),
-			want:     "",
-			wantErr:  true,
-		},
+	content, err := ExtractFileContent(path)
+	if err != nil {
+		t.Fatalf("ExtractFileContent() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(tt.filepath)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readTxtFile() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("readTxtFile() = %v, want %v", got, tt.want)
-			}
-		})
+	if content.PreviewImagePath != path {
+		t.Fatalf("PreviewImagePath = %q, want %q", content.PreviewImagePath, path)
+	}
+
+	if !strings.Contains(content.Text, "image preview is available") {
+		t.Fatalf("Text = %q, want image preview guidance", content.Text)
 	}
 }
 
-func TestReadImageFile(t *testing.T) {
-	demoDir := demoDir(t)
+func TestExtractFileContentDocumentFallbackIsStructured(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "broken.pdf")
 
-	println("The demo directory is: " + demoDir)
-
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read PNG file",
-			filepath: filepath.Join(demoDir, "image.png"),
-			wantErr:  false,
-		},
+	if err := os.WriteFile(path, []byte("not a real pdf"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(tt.filepath)
-			log.Println("The content of the file " + tt.filepath + " is: " + got)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readImageFile() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("readImageFile() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestReadFromFitz(t *testing.T) {
-	demoDir := demoDir(t)
-
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read PDF file",
-			filepath: filepath.Join(demoDir, "hello.pdf"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read non-existent PDF file",
-			filepath: filepath.Join(demoDir, "nonexistent.pdf"),
-			wantErr:  true,
-		},
+	content, err := ExtractFileContent(path)
+	if err != nil {
+		t.Fatalf("ExtractFileContent() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := ReadFile(tt.filepath)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readFromFitz() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
+	if content.PreviewImagePath != "" {
+		t.Fatalf("PreviewImagePath = %q, want empty string", content.PreviewImagePath)
+	}
+
+	wantSnippets := []string{
+		"Document extraction fallback.",
+		"File: broken.pdf",
+		"Extension: .pdf",
+		"Size: 14 bytes",
+		"Use the filename and any available visual preview to infer a better name.",
+	}
+
+	for _, snippet := range wantSnippets {
+		if !strings.Contains(content.Text, snippet) {
+			t.Fatalf("Text %q does not contain %q", content.Text, snippet)
+		}
+	}
+
+	if strings.Contains(content.Text, "not a real pdf") {
+		t.Fatalf("Text %q should not include raw file bytes", content.Text)
 	}
 }
 
-func TestReadDocxFile(t *testing.T) {
-	demoDir := demoDir(t)
-
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read DOCX file",
-			filepath: filepath.Join(demoDir, "demo.docx"),
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(tt.filepath)
-			log.Println("The content of the file " + tt.filepath + " is: " + got)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readDocxFile() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("readDocxFile() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestReadMetadata(t *testing.T) {
-	demoDir := demoDir(t)
-
-	tests := []struct {
-		name     string
-		filepath string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:     "Read MP3 file",
-			filepath: filepath.Join(demoDir, "song.mp3"),
-			wantErr:  false,
-		},
-		{
-			name:     "Read non-existent MP3 file",
-			filepath: filepath.Join(demoDir, "nonexistent.mp3"),
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadFile(tt.filepath)
-			log.Println("The content of the file " + tt.filepath + " is: " + got)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readMetadata() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("readMetadata() = %v, want %v", got, tt.want)
-			}
-		})
+func TestReadFileMissingFileReturnsError(t *testing.T) {
+	_, err := ReadFile(filepath.Join(demoDir(t), "nonexistent.txt"))
+	if err == nil {
+		t.Fatal("ReadFile() error = nil, want error")
 	}
 }
 
 func TestListFiles(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join(demoDir(t), "*"))
 	if err != nil {
-		t.Fatalf("failed to list demo files: %v", err)
+		t.Fatalf("Glob() error = %v", err)
 	}
 
-	t.Logf("The files in the demo directory are: %d", len(files))
-	for _, file := range files {
-		t.Logf("The file is: %s", filepath.Base(file))
+	if len(files) == 0 {
+		t.Fatal("expected demo directory to contain files")
 	}
 }

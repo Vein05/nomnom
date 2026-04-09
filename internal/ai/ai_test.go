@@ -157,14 +157,14 @@ func TestHandleAIProviderSelection(t *testing.T) {
 
 			// Create a minimal query just to pass to HandleAI
 			query := contentprocessors.Query{
-				Folders: []contentprocessors.FolderType{
-					{
-						Name: "test",
-						FileList: []contentprocessors.File{
-							{
-								Name:    "test.txt",
-								Context: "test",
-							},
+				Scan: contentprocessors.ScanResult{
+					RootDir: "test",
+					Files: []contentprocessors.ScannedFile{
+						{
+							SourcePath:   "/tmp/test.txt",
+							RelativePath: "test.txt",
+							OriginalName: "test.txt",
+							Context:      "test",
 						},
 					},
 				},

@@ -3,6 +3,7 @@ package files
 import (
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 // SupportedTypes lists the file types supported by nomnom, categorized by type.
@@ -73,4 +74,14 @@ func IsTypeSupported(fileType string) bool {
 
 func GetFileExtension(path string) string {
 	return filepath.Ext(path)
+}
+
+func IsDocumentFile(fileName string) bool {
+	documentExtensions := []string{".pdf", ".docx", ".epub", ".pptx", ".xlsx", ".xls"}
+	for _, ext := range documentExtensions {
+		if strings.HasSuffix(strings.ToLower(fileName), ext) {
+			return true
+		}
+	}
+	return false
 }
