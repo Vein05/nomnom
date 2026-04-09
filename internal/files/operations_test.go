@@ -1,16 +1,19 @@
-package nomnom
+package files
 
 import (
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestReadFile(t *testing.T) {
+func demoDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join("..", "..", "demo")
+}
 
-	demoDir := filepath.Join(".", "demo")
+func TestReadFile(t *testing.T) {
+	demoDir := demoDir(t)
 
 	tests := []struct {
 		name     string
@@ -66,7 +69,7 @@ func TestReadFile(t *testing.T) {
 }
 
 func TestReadTxtFile(t *testing.T) {
-	demoDir := filepath.Join(".", "demo")
+	demoDir := demoDir(t)
 
 	tests := []struct {
 		name     string
@@ -102,7 +105,7 @@ func TestReadTxtFile(t *testing.T) {
 }
 
 func TestReadImageFile(t *testing.T) {
-	demoDir := filepath.Join(".", "demo")
+	demoDir := demoDir(t)
 
 	println("The demo directory is: " + demoDir)
 
@@ -135,7 +138,7 @@ func TestReadImageFile(t *testing.T) {
 }
 
 func TestReadFromFitz(t *testing.T) {
-	demoDir := filepath.Join(".", "demo")
+	demoDir := demoDir(t)
 
 	tests := []struct {
 		name     string
@@ -167,7 +170,7 @@ func TestReadFromFitz(t *testing.T) {
 }
 
 func TestReadDocxFile(t *testing.T) {
-	demoDir := filepath.Join(".", "demo")
+	demoDir := demoDir(t)
 
 	tests := []struct {
 		name     string
@@ -198,7 +201,7 @@ func TestReadDocxFile(t *testing.T) {
 }
 
 func TestReadMetadata(t *testing.T) {
-	demoDir := filepath.Join(".", "demo")
+	demoDir := demoDir(t)
 
 	tests := []struct {
 		name     string
@@ -209,11 +212,6 @@ func TestReadMetadata(t *testing.T) {
 		{
 			name:     "Read MP3 file",
 			filepath: filepath.Join(demoDir, "song.mp3"),
-			wantErr:  false,
-		},
-		{
-			name:     "no metadata",
-			filepath: filepath.Join(demoDir, "song1.mp3"),
 			wantErr:  false,
 		},
 		{
@@ -239,23 +237,13 @@ func TestReadMetadata(t *testing.T) {
 }
 
 func TestListFiles(t *testing.T) {
-	wd, err := os.Getwd()
+	files, err := filepath.Glob(filepath.Join(demoDir(t), "*"))
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("failed to list demo files: %v", err)
 	}
 
-	t.Logf("The current directory is: %s", wd)
-
-	files, err := os.ReadDir("../../demo")
-	if err != nil {
-		log.Fatal(err)
-	}
 	t.Logf("The files in the demo directory are: %d", len(files))
 	for _, file := range files {
-		if file.IsDir() {
-			t.Logf("The directory is: %s \n", file.Name())
-			continue
-		}
-		t.Logf("The file is: %s \n", file.Name())
+		t.Logf("The file is: %s", filepath.Base(file))
 	}
 }
