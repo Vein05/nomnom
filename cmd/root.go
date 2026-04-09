@@ -28,6 +28,11 @@ var rootCmd = &cobra.Command{
 	Use:   "nomnom",
 	Short: "A Go CLI tool to bulk rename and organize files using AI.",
 	Long:  `NomNom is a command-line tool that renames files in a folder based on their content using AI models.`,
+	Example: `nomnom setup
+nomnom -d ~/Documents/files
+nomnom -d ~/Documents/files -n=false
+nomnom -d ~/Documents/files -p research
+nomnom -r .nomnom/logs/changes_123.json`,
 	Run: func(cmd *cobra.Command, _ []string) {
 		presenter := newCLIPresenter()
 		presenter.Banner()
