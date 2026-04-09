@@ -1,4 +1,4 @@
-package nomnom
+package content
 
 import (
 	"fmt"
@@ -10,8 +10,6 @@ import (
 
 	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
-
-	"github.com/fatih/color"
 )
 
 const (
@@ -125,7 +123,10 @@ func convertSize(size string) (int64, error) {
 }
 
 // ProcessDirectory processes a directory and returns a Query object
-func ProcessDirectory(dir string, config utils.Config) (Query, error) {
+func ProcessDirectory(dir string, config utils.Config, reporter utils.Reporter) (Query, error) {
+	if reporter == nil {
+		reporter = utils.NopReporter{}
+	}
 
 	performanceOpts := config.Performance.File
 	workers := performanceOpts.Workers
@@ -143,17 +144,17 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 		retries = 1
 	}
 
-	color.Blue("File processing is running with: %d workers, %s timeout, %d retries\n", workers, timeout, retries)
+	reporter.Infof("File processing is running with: %d workers, %s timeout, %d retries", workers, timeout, retries)
 
 	var query Query
 
 	// create a recursive function to process directories
 
-	var fileWg sync.WaitGroup
 	var mu sync.Mutex
 
 	var processDirectory func(path string) (*FolderType, error)
 	processDirectory = func(path string) (*FolderType, error) {
+		var fileWg sync.WaitGroup
 		var localWg sync.WaitGroup
 
 		entries, err := os.ReadDir(path)
@@ -178,7 +179,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 			if entry.IsDir() {
 				folderInfo, err := entry.Info()
 				if err != nil {
-					fmt.Printf("❌ Failed to get folder info for: %s, error: %v", entry.Name(), err)
+					reporter.Errorf("Failed to get folder info for: %s, error: %v", entry.Name(), err)
 					continue
 				}
 				folderRelativePath := filepath.Join(folder.FolderPath, folderInfo.Name())
@@ -188,7 +189,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 					defer localWg.Done()
 					subFolder, err := processDirectory(path)
 					if err != nil {
-						fmt.Printf("❌ Failed to process subdirectory: %s, error: %v", path, err)
+						reporter.Errorf("Failed to process subdirectory: %s, error: %v", path, err)
 						return
 					}
 					// Use a mutex to safely append to SubFolders
@@ -201,7 +202,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 				fileInfoPath := filepath.Join(path, entry.Name())
 				fileInfo, err := os.Stat(fileInfoPath)
 				if err != nil {
-					fmt.Printf("❌ Failed to get file info for: %s, error: %v", entry.Name(), err)
+					reporter.Errorf("Failed to get file info for: %s, error: %v", entry.Name(), err)
 					continue
 				}
 
@@ -216,11 +217,11 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 				if config.FileHandling.MaxSize != "" {
 					maxSize, err := convertSize(config.FileHandling.MaxSize)
 					if err != nil {
-						fmt.Printf("❌ Failed to parse max size: %v", err)
+						reporter.Errorf("Failed to parse max size: %v", err)
 						continue
 					}
 					if fileInfo.Size() > maxSize {
-						fmt.Printf("File: %s, size: %d, is too large to process\n", entry.Name(), fileInfo.Size())
+						reporter.Warnf("File: %s, size: %d, is too large to process", entry.Name(), fileInfo.Size())
 						continue
 					}
 				}
@@ -273,7 +274,7 @@ func ProcessDirectory(dir string, config utils.Config) (Query, error) {
 	}
 
 	query.Folders = append(query.Folders, *rootFolder)
-	fmt.Printf("Successfully processed directory: %s\n", dir)
+	reporter.Infof("Successfully processed directory: %s", dir)
 	return query, nil
 }
 

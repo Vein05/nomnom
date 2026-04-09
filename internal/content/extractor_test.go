@@ -1,4 +1,4 @@
-package nomnom
+package content
 
 import (
 	"fmt"
@@ -8,9 +8,22 @@ import (
 )
 
 func TestProcessDirectory(t *testing.T) {
-	config := utils.LoadConfig("", "")
-	path := "/Users/vein/Documents/nomnom/demo"
-	query, err := ProcessDirectory(path, config)
+	repoRoot := filepath.Clean(filepath.Join("..", ".."))
+	path := filepath.Join(repoRoot, "demo")
+	config := utils.Config{
+		FileHandling: utils.FileHandlingConfig{
+			MaxSize: "100MB",
+		},
+		Performance: utils.PerformanceConfig{
+			File: utils.PerformanceFileConfig{
+				Workers: 1,
+				Timeout: "30s",
+				Retries: 1,
+			},
+		},
+	}
+
+	query, err := ProcessDirectory(path, config, utils.NopReporter{})
 	if err != nil {
 		t.Fatalf("ProcessDirectory failed: %v", err)
 	}
