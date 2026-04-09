@@ -1,4 +1,4 @@
-package nomnom
+package ai
 
 import (
 	"fmt"
