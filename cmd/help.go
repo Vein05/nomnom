@@ -22,16 +22,18 @@ _  _                 _  _
 {{.Short}}
 
 Usage:
-{{.Use}} [flags]
+{{.CommandPath}} {{if .HasAvailableSubCommands}}[command]{{end}}{{if .HasAvailableLocalFlags}} [flags]{{end}}
+
+{{if .HasAvailableSubCommands}}Available Commands:
+{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}  {{rpad .Name .NamePadding }} {{.Short}}
+{{end}}{{end}}{{end}}
 
 Flags:
 {{.LocalFlags.FlagUsages}}
 
-Examples:
-{{.Name}} -d ~/Documents/files                    # Preview rename operations
-{{.Name}} -d ~/Documents/files -n=false          # Execute rename operations
-{{.Name}} -d ~/Documents/files -p research       # Use research prompt
-{{.Name}} -r .nomnom/logs/changes_123.json      # Revert changes` + "\n"
+{{if .Example}}Examples:
+{{.Example}}
+{{end}}` + "\n"
 
 	rootCmd.Flags().StringVarP(&cmdArgs.dir, "dir", "d", "",
 		color.CyanString("Source directory containing files to rename"))
