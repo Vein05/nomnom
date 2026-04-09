@@ -1,4 +1,4 @@
-package nomnom
+package utils
 
 import (
 	"regexp"
