@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	ai "nomnom/internal/ai"
-	contentprocessors "nomnom/internal/content"
+	content "nomnom/internal/content"
 	files "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 
@@ -28,94 +27,14 @@ type args struct {
 
 var cmdArgs = &args{}
 
-func printSummary(results []contentprocessors.ProcessResult) {
-	success := color.New(color.FgGreen).SprintFunc()
-	failed := color.New(color.FgRed).SprintFunc()
-	info := color.New(color.FgCyan).SprintFunc()
-
-	fmt.Printf("%s\n", info("📊 Summary of Operations"))
-
-	fmt.Printf("%s\n", info("══════════════════════"))
-
-	for _, result := range results {
-		if result.Success {
-			fmt.Printf("%s \033]8;;file://%s\033\\%s\033]8;;\033\\ → \033]8;;file://%s\033\\%s\033]8;;\033\\\n",
-				success("✓"),
-				result.OriginalPath,
-				filepath.Base(result.OriginalPath),
-				result.FullNewPath,
-				filepath.Base(result.NewPath))
-		} else {
-			fmt.Printf("%s \033]8;;file://%s\033\\%s\033]8;;\033\\ (Error: %v)\n",
-				failed("✗"),
-				result.OriginalPath,
-				filepath.Base(result.OriginalPath),
-				result.Error)
-		}
-	}
-}
-
-func generateSummary(results []contentprocessors.ProcessResult) (successCount int) {
-	info := color.New(color.FgCyan).SprintFunc()
-
-	fmt.Printf("%s\n", info("📊 Processing Results"))
-
-	fmt.Printf("%s\n", info("══════════════════════"))
-	successCount = 0
-	for _, result := range results {
-		if result.Success {
-			successCount++
-			if cmdArgs.dryRun {
-				fmt.Printf("%s \033]8;;file://%s\033\\%s\033]8;;\033\\ → %s\n",
-					color.GreenString("🔍 Would rename:"),
-					result.FullOriginalPath,
-					filepath.Base(result.OriginalPath),
-					filepath.Base(result.NewPath))
-			} else {
-				fmt.Printf("%s %s →\033]8;;file://%s\033\\%s\033]8;;\033\\ \n",
-					color.GreenString("✅ Renamed:"),
-					filepath.Base(result.OriginalPath),
-					result.FullNewPath,
-					filepath.Base(result.NewPath))
-			}
-		} else {
-			fmt.Printf("%s %s (Error: %v)\n",
-				color.RedString("❌ Failed to process:"),
-				filepath.Base(result.OriginalPath),
-				result.Error)
-		}
-	}
-	return successCount
-}
-
 var rootCmd = &cobra.Command{
 	Use:   "nomnom",
 	Short: "A Go CLI tool to bulk rename and organize files using AI.",
 	Long:  `NomNom is a command-line tool that renames files in a folder based on their content using AI models.`,
 	Run: func(cmd *cobra.Command, _ []string) {
-		info := color.New(color.FgCyan).SprintFunc()
-		title := color.New(color.FgBlue).SprintFunc()
-
-		fmt.Println(color.BlueString(`
-			_  _                 _  _                 
-			| \| | ___  _ __    | \| | ___  _ __ ___  
-			| .  |/ _ \| '_ \   | .  |/ _ \| '_ ' _ \ 
-			| |\  | (_) | | | |  | |\  | (_) | | | | | |
-			|_| \_|\___/|_| |_|  |_| \_|\___/|_| |_| |_|
-			`))
-		message := "Welcome to NomNom"
-		fmt.Printf("%s ", color.WhiteString("▶"))
-		for _, char := range message {
-			fmt.Printf("%s", color.BlueString(string(char)))
-			time.Sleep(50 * time.Millisecond)
-		}
-		fmt.Println()
-
-		githubLink := "https://github.com/vein05/nomnom"
-		fmt.Printf("%s %s\n", color.WhiteString("▶"), color.BlueString(githubLink))
-
-		fmt.Printf("%s\n", info("══════════════════════"))
-		time.Sleep(2 * time.Second)
+		presenter := newCLIPresenter()
+		presenter.Banner()
+		presenter.Divider()
 
 		// Check if revert flag is set
 		if cmdArgs.revert != "" {
@@ -123,6 +42,8 @@ var rootCmd = &cobra.Command{
 				ChangeLogPath: cmdArgs.revert,
 				EnableLogging: cmdArgs.log,
 				AutoApprove:   cmdArgs.autoApprove,
+				Reporter:      presenter,
+				Approver:      presenter,
 			}
 
 			if err := files.ProcessRevert(opts); err != nil {
@@ -133,10 +54,14 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Load configuration
-		config := utils.LoadConfig(cmdArgs.configPath, "")
-		fmt.Printf("%s\n", info("══════════════════════"))
+		config, err := utils.LoadConfig(cmdArgs.configPath, "")
+		if err != nil {
+			color.Red("Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		presenter.Divider()
 		// Create a new query
-		query, err := contentprocessors.NewQuery(
+		query, err := content.NewQuery(
 			cmdArgs.prompt,
 			cmdArgs.dir,
 			cmdArgs.configPath,
@@ -145,12 +70,14 @@ var rootCmd = &cobra.Command{
 			cmdArgs.dryRun,
 			cmdArgs.log,
 			cmdArgs.organize,
+			presenter,
+			presenter,
 		)
 		if err != nil {
 			color.Red("Error creating query: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
 
 		// Set up output directory
 		outputDir := config.Output
@@ -162,11 +89,11 @@ var rootCmd = &cobra.Command{
 		if cmdArgs.dryRun {
 			output_text = fmt.Sprintf("Output directory would be set up at: %s", outputDir)
 		}
-		fmt.Printf("%s\n", title(output_text))
+		presenter.Titlef(output_text)
 
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
 
-		fmt.Printf("%s\n", title("Processing files with AI to generate new names"))
+		presenter.Titlef("Processing files with AI to generate new names")
 
 		// Process files with AI to get new names
 		aiResult, err := ai.HandleAI(config, *query)
@@ -175,35 +102,35 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
 
 		// Update query with AI results
 		query.Folders = aiResult.Folders
 
 		// Create and run the safe processor
-		fmt.Printf("%s\n", title("Processing file renames"))
+		presenter.Titlef("Processing file renames")
 
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
 
-		processor := contentprocessors.NewSafeProcessor(query, outputDir)
+		processor := content.NewSafeProcessor(query, outputDir)
 		results, err := processor.Process()
 		if err != nil {
 			color.Red("Error processing files: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("%s\n", info("══════════════════════"))
-		fmt.Printf("%s\n", title("Processing files with AI to generate new names\n"))
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
+		presenter.Titlef("Processing files with AI to generate new names")
+		presenter.Divider()
 
-		successCount := generateSummary(results)
+		successCount := presenter.PrintResults(results, cmdArgs.dryRun)
 
-		fmt.Printf("%s\n", info("══════════════════════"))
+		presenter.Divider()
 
 		if cmdArgs.dryRun {
 			color.Green("\n%s %d files would be renamed successfully.\n", ("✅"), successCount)
 			color.Yellow("\nTo apply these changes, run: nomnom -d \"%s\" --dry-run=false\n", cmdArgs.dir)
 		} else {
-			printSummary(results)
+			presenter.PrintSummary(results)
 		}
 	},
 }
