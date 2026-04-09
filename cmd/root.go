@@ -3,12 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	ai "nomnom/internal/ai"
-	content "nomnom/internal/content"
+	app "nomnom/internal/app"
 	files "nomnom/internal/files"
-	utils "nomnom/internal/utils"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -53,67 +50,50 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// Load configuration
-		config, err := utils.LoadConfig(cmdArgs.configPath, "")
+		service := app.NewService()
+		presenter.Divider()
+		run, err := service.PrepareRun(app.RunOptions{
+			Dir:         cmdArgs.dir,
+			ConfigPath:  cmdArgs.configPath,
+			Prompt:      cmdArgs.prompt,
+			AutoApprove: cmdArgs.autoApprove,
+			DryRun:      cmdArgs.dryRun,
+			Log:         cmdArgs.log,
+			Organize:    cmdArgs.organize,
+		}, presenter, presenter)
 		if err != nil {
-			color.Red("Error loading config: %v\n", err)
+			color.Red("Error preparing run: %v\n", err)
 			os.Exit(1)
 		}
-		presenter.Divider()
-		// Create a new query
-		query, err := content.NewQuery(
-			cmdArgs.prompt,
-			cmdArgs.dir,
-			cmdArgs.configPath,
-			config,
-			cmdArgs.autoApprove,
-			cmdArgs.dryRun,
-			cmdArgs.log,
-			cmdArgs.organize,
-			presenter,
-			presenter,
-		)
-		if err != nil {
-			color.Red("Error creating query: %v\n", err)
-			os.Exit(1)
-		}
+		defer func() {
+			if err := run.Close(); err != nil {
+				color.Red("Error closing run resources: %v\n", err)
+			}
+		}()
 		presenter.Divider()
 
-		// Set up output directory
-		outputDir := config.Output
-		if outputDir == "" {
-			outputDir = filepath.Join(cmdArgs.dir, "nomnom", "renamed")
-		}
-
-		output_text := fmt.Sprintf("Output directory set up at: %s", outputDir)
+		outputText := fmt.Sprintf("Output directory set up at: %s", run.OutputDir)
 		if cmdArgs.dryRun {
-			output_text = fmt.Sprintf("Output directory would be set up at: %s", outputDir)
+			outputText = fmt.Sprintf("Output directory would be set up at: %s", run.OutputDir)
 		}
-		presenter.Titlef(output_text)
+		presenter.Titlef(outputText)
 
 		presenter.Divider()
 
 		presenter.Titlef("Processing files with AI to generate new names")
 
-		// Process files with AI to get new names
-		aiResult, err := ai.HandleAI(config, *query)
-		if err != nil {
+		if err := service.GeneratePlan(run); err != nil {
 			color.Red("Error processing files with AI: %v\n", err)
 			os.Exit(1)
 		}
 
 		presenter.Divider()
 
-		// Update query with AI results
-		query.Folders = aiResult.Folders
-
-		// Create and run the safe processor
 		presenter.Titlef("Processing file renames")
 
 		presenter.Divider()
 
-		processor := content.NewSafeProcessor(query, outputDir)
-		results, err := processor.Process()
+		results, err := service.ApplyPlan(run)
 		if err != nil {
 			color.Red("Error processing files: %v\n", err)
 			os.Exit(1)

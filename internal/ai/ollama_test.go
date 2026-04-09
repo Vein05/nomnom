@@ -48,21 +48,20 @@ func TestSendQueryWithOllama(t *testing.T) {
 
 	// Create a test query with sample data
 	testQuery := contentprocessors.Query{
-		Folders: []contentprocessors.FolderType{
-			{
-				Name:       "TestFolder",
-				FolderPath: "/test/path",
-				FileList: []contentprocessors.File{
-					{
-						Name:    "test_file.txt",
-						Path:    "/test/path/test_file.txt",
-						Context: "This is a test file containing important information about a game called Rain World.",
-					},
-					{
-						Name:    "image.jpg",
-						Path:    "../../demo/small/Image 484972979.jpg",
-						Context: "",
-					},
+		Scan: contentprocessors.ScanResult{
+			RootDir: "/test/path",
+			Files: []contentprocessors.ScannedFile{
+				{
+					SourcePath:   "/test/path/test_file.txt",
+					RelativePath: "test_file.txt",
+					OriginalName: "test_file.txt",
+					Context:      "This is a test file containing important information about a game called Rain World.",
+				},
+				{
+					SourcePath:   "../../demo/small/Image 484972979.jpg",
+					RelativePath: "image.jpg",
+					OriginalName: "image.jpg",
+					Context:      "",
 				},
 			},
 		},
@@ -75,10 +74,10 @@ func TestSendQueryWithOllama(t *testing.T) {
 	}
 
 	// Verify that new names were assigned for all files
-	for i, file := range result.Folders[0].FileList {
-		if file.NewName == "" {
-			t.Errorf("Expected NewName to be set for file %s", file.Name)
+	for i, entry := range result.Plan {
+		if entry.SuggestedName == "" {
+			t.Errorf("Expected SuggestedName to be set for file %s", entry.File.OriginalName)
 		}
-		fmt.Printf("File %d - Old Name: %s, New Name: %s\n", i+1, file.Name, file.NewName)
+		fmt.Printf("File %d - Old Name: %s, New Name: %s\n", i+1, entry.File.OriginalName, entry.SuggestedName)
 	}
 }

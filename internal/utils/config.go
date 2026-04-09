@@ -107,14 +107,11 @@ func ResolveConfigPath(path string) (string, error) {
 
 // LoadConfig loads and parses the configuration file from the specified path.
 // If path is empty, it uses the default location for the current OS.
-func LoadConfig(path string, step string) (Config, error) {
+func LoadConfig(path string, _ string) (Config, error) {
 	resolvedPath, err := ResolveConfigPath(path)
 	if err != nil {
 		return Config{}, err
 	}
-
-	// Print the config file path being loaded
-	fmt.Printf(step+"Loading config from: %s\n", resolvedPath)
 
 	// Read the config file
 	file, err := os.ReadFile(resolvedPath)

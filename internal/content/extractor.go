@@ -1,9 +1,11 @@
 package content
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,50 +21,20 @@ const (
 	GB = 1024 * MB
 )
 
-// FolderType represents a directory structure containing files and subfolders with:
-type FolderType struct {
-	// Name is the name of the folder
-	Name string `json:"name,omitempty"`
-	// FileList contains all files in the current folder
-	FileList []File `json:"file_list,omitempty"`
-	// FolderPath stores the absolute path to this folder
-	FolderPath string `json:"folder_path,omitempty"`
-	// SubFolders contains all nested folders within this folder
-	SubFolders []FolderType `json:"sub_folders,omitempty"`
+type ScannedFile struct {
+	SourcePath   string `json:"source_path,omitempty"`
+	RelativePath string `json:"relative_path,omitempty"`
+	OriginalName string `json:"original_name,omitempty"`
+	Extension    string `json:"extension,omitempty"`
+	Context      string `json:"context,omitempty"`
+	VisualPath   string `json:"visual_path,omitempty"`
+	Size         int64  `json:"size,omitempty"`
+	Category     string `json:"category,omitempty"`
 }
 
-// File represents a single file in the system with metadata and processing info
-type File struct {
-	// UNCHANGEDPATH stores the original path that should not be modified
-	UNCHANGEDPATH string `json:"unchanged_path,omitempty"`
-	// Name is the current filename
-	Name string `json:"name,omitempty"`
-	// NewName stores the processed/renamed filename
-	NewName string `json:"new_name,omitempty"`
-	// Path contains the full path to the file
-	Path string `json:"path,omitempty"`
-	// Context stores additional contextual information about the file
-	Context string `json:"context,omitempty"`
-	// Size represents the file size in bytes
-	Size int64 `json:"size,omitempty"`
-	// FormattedSize is the human-readable file size (e.g., "1.5 MB")
-	FormattedSize string `json:"formatted_size,omitempty"`
-	// FailedReason contains error description if processing failed
-	FailedReason string `json:"failed_reason,omitempty"`
-}
-
-// result represents the outcome of a file processing operation
-type result struct {
-	// File contains the processed file information
-	File File
-	// Err holds any error that occurred during processing
-	Err error
-	// Workers specifies the number of concurrent workers used
-	Workers int `json:"workers,omitempty"`
-	// Timeout specifies the processing time limit
-	Timeout string `json:"timeout,omitempty"`
-	// Retries indicates the number of retry attempts made
-	Retries int `json:"retries,omitempty"`
+type ScanResult struct {
+	RootDir string        `json:"root_dir,omitempty"`
+	Files   []ScannedFile `json:"files,omitempty"`
 }
 
 func formatFileSize(size int64) string {
@@ -72,258 +44,225 @@ func formatFileSize(size int64) string {
 		return fmt.Sprintf("%.2fKB", float64(size)/KB)
 	} else if size < GB {
 		return fmt.Sprintf("%.2fMB", float64(size)/MB)
-	} else {
-		return fmt.Sprintf("%.2fGB", float64(size)/GB)
 	}
+	return fmt.Sprintf("%.2fGB", float64(size)/GB)
 }
 
-// write a reverse of formatFileSize that understands the units
 func convertSize(size string) (int64, error) {
 	size = strings.ToLower(size)
-	// check if the size is in bytes
-	if strings.HasSuffix(size, "kb") {
-		// remove the k
-		size = strings.TrimSuffix(size, "kb")
-		b, err := strconv.ParseInt(size, 10, 64)
+	switch {
+	case strings.HasSuffix(size, "kb"):
+		value, err := strconv.ParseInt(strings.TrimSuffix(size, "kb"), 10, 64)
 		if err != nil {
 			return 0, err
 		}
-		return b * KB, nil
-	}
-	if strings.HasSuffix(size, "mb") {
-		// remove the m
-		size = strings.TrimSuffix(size, "mb")
-		b, err := strconv.ParseInt(size, 10, 64)
+		return value * KB, nil
+	case strings.HasSuffix(size, "mb"):
+		value, err := strconv.ParseInt(strings.TrimSuffix(size, "mb"), 10, 64)
 		if err != nil {
 			return 0, err
 		}
-		return b * MB, nil
-	}
-	if strings.HasSuffix(size, "gb") {
-		// remove the g
-		size = strings.TrimSuffix(size, "gb")
-		b, err := strconv.ParseInt(size, 10, 64)
+		return value * MB, nil
+	case strings.HasSuffix(size, "gb"):
+		value, err := strconv.ParseInt(strings.TrimSuffix(size, "gb"), 10, 64)
 		if err != nil {
 			return 0, err
 		}
-		return b * GB, nil
+		return value * GB, nil
+	case strings.HasSuffix(size, "b"):
+		return strconv.ParseInt(strings.TrimSuffix(size, "b"), 10, 64)
+	default:
+		return 0, fmt.Errorf("invalid size: %s", size)
 	}
-
-	if strings.HasSuffix(size, "b") {
-		// remove the b
-		size = strings.TrimSuffix(size, "b")
-		b, err := strconv.ParseInt(size, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return b, nil
-	}
-
-	return 0, fmt.Errorf("invalid size: %s", size)
 }
 
-// ProcessDirectory processes a directory and returns a Query object
-func ProcessDirectory(dir string, config utils.Config, reporter utils.Reporter) (Query, error) {
+func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (ScanResult, error) {
 	if reporter == nil {
 		reporter = utils.NopReporter{}
 	}
 
-	performanceOpts := config.Performance.File
-	workers := performanceOpts.Workers
-	timeout := performanceOpts.Timeout
-	retries := performanceOpts.Retries
-
-	// set defaults if not provided
+	workers := config.Performance.File.Workers
 	if workers == 0 {
 		workers = 1
 	}
+	timeout := config.Performance.File.Timeout
 	if timeout == "" {
 		timeout = "30s"
 	}
+	retries := config.Performance.File.Retries
 	if retries == 0 {
 		retries = 1
 	}
 
 	reporter.Infof("File processing is running with: %d workers, %s timeout, %d retries", workers, timeout, retries)
 
-	var query Query
-
-	// create a recursive function to process directories
-
-	var mu sync.Mutex
-
-	var processDirectory func(path string) (*FolderType, error)
-	processDirectory = func(path string) (*FolderType, error) {
-		var fileWg sync.WaitGroup
-		var localWg sync.WaitGroup
-
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read directory %s: %w", path, err)
-		}
-		folder := &FolderType{
-			Name:       filepath.Base(path),
-			FolderPath: path,
-			FileList:   []File{},
-			SubFolders: []FolderType{},
-		}
-
-		var dirCount int
-		var fileCount int
-
-		// Create buffered channels for results and semaphore for worker limiting
-		results := make(chan result, len(entries))
-		sem := make(chan struct{}, workers) // Semaphore to limit concurrent operations
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				folderInfo, err := entry.Info()
-				if err != nil {
-					reporter.Errorf("Failed to get folder info for: %s, error: %v", entry.Name(), err)
-					continue
-				}
-				folderRelativePath := filepath.Join(folder.FolderPath, folderInfo.Name())
-				localWg.Add(1)
-				dirCount++
-				go func(path string) {
-					defer localWg.Done()
-					subFolder, err := processDirectory(path)
-					if err != nil {
-						reporter.Errorf("Failed to process subdirectory: %s, error: %v", path, err)
-						return
-					}
-					// Use a mutex to safely append to SubFolders
-					mu.Lock()
-					folder.SubFolders = append(folder.SubFolders, *subFolder)
-					mu.Unlock()
-				}(folderRelativePath)
-
-			} else {
-				fileInfoPath := filepath.Join(path, entry.Name())
-				fileInfo, err := os.Stat(fileInfoPath)
-				if err != nil {
-					reporter.Errorf("Failed to get file info for: %s, error: %v", entry.Name(), err)
-					continue
-				}
-
-				// Skip system and hidden files
-				if strings.HasPrefix(fileInfo.Name(), ".") ||
-					strings.HasSuffix(fileInfo.Name(), "~") ||
-					strings.HasSuffix(fileInfo.Name(), ".tmp") ||
-					strings.HasSuffix(fileInfo.Name(), ".swp") {
-					continue
-				}
-
-				if config.FileHandling.MaxSize != "" {
-					maxSize, err := convertSize(config.FileHandling.MaxSize)
-					if err != nil {
-						reporter.Errorf("Failed to parse max size: %v", err)
-						continue
-					}
-					if fileInfo.Size() > maxSize {
-						reporter.Warnf("File: %s, size: %d, is too large to process", entry.Name(), fileInfo.Size())
-						continue
-					}
-				}
-
-				fileCount++
-				fileWg.Add(1)
-				go func(f os.DirEntry) {
-					defer fileWg.Done()
-					sem <- struct{}{} // Acquire semaphore
-					defer func() {
-						<-sem // Release semaphore when done
-					}()
-					processFile(f, path, results)
-				}(entry)
-
-			}
-
-		}
-		if fileCount > 0 {
-			go func() {
-				fileWg.Wait()
-				localWg.Wait()
-				// Wait for all goroutines to finish
-				// Close the results channel after all goroutines are done
-				close(results)
-
-			}()
-
-			// Collect results
-			for result := range results {
-				if result.Err != nil {
-					continue
-				}
-				folder.FileList = append(folder.FileList, result.File)
-			}
-		} else {
-			// If no files were processed, close the results channel
-			close(results)
-		}
-
-		localWg.Wait() // Wait for all subdirectory processing to finish
-
-		return folder, nil // maybe append to a list of folders or somehting like that?
-	}
-
-	// start processing the files
-	rootFolder, err := processDirectory(dir)
+	rootDir, err := filepath.Abs(dir)
 	if err != nil {
-		return Query{}, fmt.Errorf("failed to process directory %s: %w", dir, err)
+		return ScanResult{}, fmt.Errorf("failed to resolve directory %s: %w", dir, err)
 	}
 
-	query.Folders = append(query.Folders, *rootFolder)
-	reporter.Infof("Successfully processed directory: %s", dir)
-	return query, nil
+	entries, err := os.ReadDir(rootDir)
+	if err != nil {
+		return ScanResult{}, fmt.Errorf("failed to read directory %s: %w", rootDir, err)
+	}
+
+	paths := make([]string, 0, len(entries))
+	if err := collectPaths(rootDir, entries, &paths); err != nil {
+		return ScanResult{}, err
+	}
+
+	maxSize, err := maxFileSize(config)
+	if err != nil {
+		return ScanResult{}, err
+	}
+
+	result := ScanResult{
+		RootDir: rootDir,
+		Files:   make([]ScannedFile, 0, len(paths)),
+	}
+
+	type fileResult struct {
+		file ScannedFile
+		err  error
+	}
+
+	sem := make(chan struct{}, workers)
+	results := make(chan fileResult, len(paths))
+	var wg sync.WaitGroup
+
+	for _, path := range paths {
+		path := path
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			file, err := scanFile(rootDir, path, maxSize)
+			results <- fileResult{file: file, err: err}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for item := range results {
+		if item.err != nil {
+			reporter.Warnf("%v", item.err)
+			continue
+		}
+		result.Files = append(result.Files, item.file)
+	}
+
+	slices.SortFunc(result.Files, func(a, b ScannedFile) int {
+		return strings.Compare(a.RelativePath, b.RelativePath)
+	})
+
+	reporter.Infof("Successfully processed directory: %s", rootDir)
+	return result, nil
 }
 
-func readFiles(file string, results chan result) {
-	fileContent, err := fileutils.ReadFile(file)
-	if err != nil {
-		fmt.Printf("❌ Failed to read file: %s, error: %v", file, err)
-		results <- result{
-			File: File{},
-			Err:  err,
+func collectPaths(root string, entries []os.DirEntry, paths *[]string) error {
+	for _, entry := range entries {
+		fullPath := filepath.Join(root, entry.Name())
+
+		if entry.IsDir() {
+			subEntries, err := os.ReadDir(fullPath)
+			if err != nil {
+				return fmt.Errorf("failed to read directory %s: %w", fullPath, err)
+			}
+			if err := collectPaths(fullPath, subEntries, paths); err != nil {
+				return err
+			}
+			continue
 		}
-		return
+
+		if shouldSkip(entry.Name()) {
+			continue
+		}
+
+		*paths = append(*paths, fullPath)
 	}
-	results <- result{
-		File: File{
-			Path:    file,
-			Context: string(fileContent),
-		},
-		Err: err,
-	}
+
+	return nil
 }
 
-func processFile(f os.DirEntry, dir string, results chan result) {
-	fileInfo, _ := os.Stat(filepath.Join(dir, f.Name()))
-	resultChan := make(chan result, 1)
-	readFiles(filepath.Join(dir, f.Name()), resultChan)
-	fileResult := <-resultChan
+func shouldSkip(name string) bool {
+	return strings.HasPrefix(name, ".") ||
+		strings.HasSuffix(name, "~") ||
+		strings.HasSuffix(name, ".tmp") ||
+		strings.HasSuffix(name, ".swp")
+}
 
-	if fileResult.Err != nil {
-		fmt.Printf("❌ Failed to read file: %s, error: %v", f.Name(), fileResult.Err)
-		results <- result{Err: fileResult.Err}
-		return
+func maxFileSize(config utils.Config) (int64, error) {
+	if config.FileHandling.MaxSize == "" {
+		return 0, nil
 	}
 
-	context := fmt.Sprintf("Content: %s\nFile: %s Extension Type: %s\nSize: %s",
-		fileResult.File.Context,
-		f.Name(),
-		filepath.Ext(f.Name()),
-		formatFileSize(fileInfo.Size()),
-	)
-
-	results <- result{
-		File: File{
-			UNCHANGEDPATH: filepath.Join(dir, f.Name()),
-			Name:          f.Name(),
-			Path:          filepath.Join(dir, f.Name()),
-			Size:          fileInfo.Size(),
-			Context:       context,
-			FormattedSize: formatFileSize(fileInfo.Size()),
-		},
+	maxSize, err := convertSize(config.FileHandling.MaxSize)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse max size: %w", err)
 	}
+	return maxSize, nil
+}
+
+func scanFile(rootDir, path string, maxSize int64) (ScannedFile, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ScannedFile{}, fmt.Errorf("failed to stat file %s: %w", path, err)
+	}
+
+	if maxSize > 0 && info.Size() > maxSize {
+		return ScannedFile{}, fmt.Errorf("file %s is too large to process", path)
+	}
+
+	extracted, err := fileutils.ExtractFileContent(path)
+	if err != nil {
+		return ScannedFile{}, fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+
+	relativePath, err := filepath.Rel(rootDir, path)
+	if err != nil {
+		return ScannedFile{}, fmt.Errorf("failed to compute relative path for %s: %w", path, err)
+	}
+
+	name := filepath.Base(path)
+	return ScannedFile{
+		SourcePath:   path,
+		RelativePath: relativePath,
+		OriginalName: name,
+		Extension:    filepath.Ext(name),
+		Context: fmt.Sprintf("Content: %s\nFile: %s\nExtension Type: %s\nSize: %s",
+			extracted.Text,
+			name,
+			filepath.Ext(name),
+			formatFileSize(info.Size()),
+		),
+		VisualPath: extracted.PreviewImagePath,
+		Size:       info.Size(),
+		Category:   categoryForFile(name),
+	}, nil
+}
+
+func (r ScanResult) Cleanup() error {
+	paths := make(map[string]struct{})
+	var cleanupErr error
+
+	for _, file := range r.Files {
+		if file.VisualPath == "" || file.VisualPath == file.SourcePath {
+			continue
+		}
+		if _, seen := paths[file.VisualPath]; seen {
+			continue
+		}
+		paths[file.VisualPath] = struct{}{}
+
+		if err := os.Remove(file.VisualPath); err != nil && !os.IsNotExist(err) {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove preview %s: %w", file.VisualPath, err))
+		}
+	}
+
+	return cleanupErr
 }

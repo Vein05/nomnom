@@ -1,10 +1,11 @@
 package content
 
 import (
-	"fmt"
-	utils "nomnom/internal/utils"
+	"os"
 	"path/filepath"
 	"testing"
+
+	utils "nomnom/internal/utils"
 )
 
 func TestProcessDirectory(t *testing.T) {
@@ -23,36 +24,23 @@ func TestProcessDirectory(t *testing.T) {
 		},
 	}
 
-	query, err := ProcessDirectory(path, config, utils.NopReporter{})
+	scan, err := ScanDirectory(path, config, utils.NopReporter{})
 	if err != nil {
-		t.Fatalf("ProcessDirectory failed: %v", err)
+		t.Fatalf("ScanDirectory failed: %v", err)
 	}
 
-	// Recursive function to print folder structure
-	var printFolder func(folder FolderType, indent string)
-	printFolder = func(folder FolderType, indent string) {
-		relPath, err := filepath.Rel(path, folder.FolderPath)
-		if err != nil {
-			t.Fatalf("Failed to get relative path: %v", err)
-		}
-
-		fmt.Printf("%s📁 %s\n", indent, relPath)
-		fmt.Printf("%s  Files: %d, Subfolders: %d\n", indent, len(folder.FileList), len(folder.SubFolders))
-
-		// Print files
-		for _, file := range folder.FileList {
-			fmt.Printf("%s  └── 📄 %s\n", indent, file.Name)
-		}
-
-		// Recursively print subfolders
-		for _, subfolder := range folder.SubFolders {
-			printFolder(subfolder, indent+"    ")
-		}
+	if scan.RootDir == "" {
+		t.Fatal("ScanDirectory() returned empty root dir")
 	}
 
-	fmt.Printf("Found %d root folders\n", len(query.Folders))
-	for _, folder := range query.Folders {
-		printFolder(folder, "")
+	if len(scan.Files) == 0 {
+		t.Fatal("ScanDirectory() returned no files")
+	}
+
+	for index := 1; index < len(scan.Files); index++ {
+		if scan.Files[index-1].RelativePath > scan.Files[index].RelativePath {
+			t.Fatalf("ScanDirectory() returned files out of order: %q before %q", scan.Files[index-1].RelativePath, scan.Files[index].RelativePath)
+		}
 	}
 }
 
@@ -96,5 +84,36 @@ func TestConvertSize(t *testing.T) {
 	if convertedSize != 100 {
 		t.Fatalf("Expected 100B, got %d", convertedSize)
 	}
+}
 
+func TestScanResultCleanupRemovesGeneratedPreviews(t *testing.T) {
+	tmpDir := t.TempDir()
+	previewPath := filepath.Join(tmpDir, "preview.jpg")
+	sourcePath := filepath.Join(tmpDir, "source.pdf")
+	imagePath := filepath.Join(tmpDir, "image.png")
+
+	for _, path := range []string{previewPath, sourcePath, imagePath} {
+		if err := os.WriteFile(path, []byte("test"), 0o644); err != nil {
+			t.Fatalf("WriteFile(%q) error = %v", path, err)
+		}
+	}
+
+	scan := ScanResult{
+		Files: []ScannedFile{
+			{SourcePath: sourcePath, VisualPath: previewPath},
+			{SourcePath: imagePath, VisualPath: imagePath},
+		},
+	}
+
+	if err := scan.Cleanup(); err != nil {
+		t.Fatalf("Cleanup() error = %v", err)
+	}
+
+	if _, err := os.Stat(previewPath); !os.IsNotExist(err) {
+		t.Fatalf("Cleanup() should remove generated preview, stat err = %v", err)
+	}
+
+	if _, err := os.Stat(imagePath); err != nil {
+		t.Fatalf("Cleanup() should keep source image, stat err = %v", err)
+	}
 }
