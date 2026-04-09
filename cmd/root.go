@@ -29,6 +29,7 @@ var rootCmd = &cobra.Command{
 	Short: "A Go CLI tool to bulk rename and organize files using AI.",
 	Long:  `NomNom is a command-line tool that renames files in a folder based on their content using AI models.`,
 	Example: `nomnom setup
+nomnom analytics -d ~/Documents/files
 nomnom -d ~/Documents/files
 nomnom -d ~/Documents/files -n=false
 nomnom -d ~/Documents/files -p research
