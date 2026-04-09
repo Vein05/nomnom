@@ -5,12 +5,12 @@ go 1.24.0
 toolchain go1.24.1
 
 require (
-	github.com/cohesion-org/deepseek-go v1.2.12
+	github.com/cohesion-org/deepseek-go v1.3.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/fatih/color v1.7.0
 	github.com/gen2brain/go-fitz v1.24.14
 	github.com/manifoldco/promptui v0.9.0
-	github.com/ollama/ollama v0.6.2
+	github.com/ollama/ollama v0.6.6
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/text v0.23.0
