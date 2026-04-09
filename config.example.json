@@ -1,11 +1,11 @@
 {
-  "output": "", 
+  "output": "",
   "case": "snake",
   "ai": {
     "api_key": "",
     "provider": "openrouter",
-    "model": "",
-    "vision" : {
+    "model": "google/gemini-2.0-flash-001",
+    "vision": {
       "enabled": true,
       "max_image_size": "10MB"
     },
@@ -38,6 +38,6 @@
   },
   "logging": {
     "enabled": true,
-    "log_path": "nomnom/logs"
+    "log_path": ".nomnom/logs"
   }
 }
