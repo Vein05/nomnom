@@ -1,11 +1,9 @@
-package nomnom
+package files
 
 import (
 	"fmt"
-	"image/jpeg"
 
 	"os"
-	"path/filepath"
 	"strings"
 
 	log "log"
@@ -27,7 +25,7 @@ func ReadFile(path string) (string, error) {
 		return content, nil
 	}
 
-	if extension == "png" || extension == "jpg" || extension == "jpeg" || extension == ".webp" {
+	if extension == "png" || extension == "jpg" || extension == "jpeg" || extension == "webp" {
 		text, err := readImageFile(path)
 		if err != nil {
 			return "There was an error reading the file" + path, err
@@ -71,7 +69,7 @@ func readImageFile(_ string) (string, error) {
 	return "An image will be attached with this message. If it's not attached, don't rename it.", nil
 }
 
-// convert pdf to image and then read the image using the readImageFile function
+// readFromFitz extracts text from the first two pages of supported documents.
 func readFromFitz(path string) (string, error) {
 	doc, err := fitz.New(path)
 	if err != nil {
@@ -79,46 +77,29 @@ func readFromFitz(path string) (string, error) {
 	}
 	defer doc.Close()
 
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "nomnom")
-	if err != nil {
-		panic(err)
+	pageCount := doc.NumPage()
+	if pageCount == 0 {
+		return "", nil
 	}
 
-	var text string
+	limit := min(pageCount, 2)
+	pages := make([]string, 0, limit)
 
-	// Extract pages as images
-	// we only need the first 2 pages as they should give us the most context for the name
-	for n := range 2 {
-		img, err := doc.Image(n)
+	for page := 0; page < limit; page++ {
+		text, err := doc.Text(page)
 		if err != nil {
-			return "There was an error reading the file: extracting image" + path, err
+			return "There was an error reading the file: extracting text" + path, err
 		}
 
-		f, err := os.Create(filepath.Join(tmpDir, fmt.Sprintf("nomnom-%03d.jpg", n)))
-		if err != nil {
-			return "There was an error reading the file: creating image" + path, err
+		text = strings.TrimSpace(text)
+		if text == "" {
+			continue
 		}
 
-		err = jpeg.Encode(f, img, &jpeg.Options{Quality: jpeg.DefaultQuality})
-		if err != nil {
-			return "There was an error reading the file: encoding image" + path, err
-		}
-
-		f.Close()
-
-		// give the full path to the image file
-		text, err = readImageFile(filepath.Join(tmpDir, fmt.Sprintf("nomnom-%03d.jpg", n)))
-
-		if err != nil {
-			return "There was an error reading the file" + path, err
-		}
-		text += text
-
+		pages = append(pages, text)
 	}
-	// delete the tmpDir
-	os.RemoveAll(tmpDir)
 
-	return text, nil
+	return strings.Join(pages, "\n\n"), nil
 }
 
 func readMetadata(path string) (string, error) {
