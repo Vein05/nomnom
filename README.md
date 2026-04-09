@@ -1,12 +1,34 @@
-# NomNom
+<h1 align="center">NomNom</h1>
 
-NomNom is a Go CLI for renaming files with AI. It scans a directory, extracts lightweight context from each file, asks an AI model for a better filename, and writes the renamed copies into a separate output directory.
+<p align="center">
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white" alt="Go 1.24+" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License" />
+  </a>
+  <a href="https://github.com/vein05/nomnom">
+    <img src="https://img.shields.io/badge/Platform-CLI-black" alt="CLI" />
+  </a>
+</p>
 
-![NomNom logo](nomnom.png)
+<p align="center">
+  <img src="banner.png" alt="NomNom banner" width="720" />
+</p>
+
+<p align="center">
+  NomNom is a Go CLI for organizing and renaming files with AI. It scans a directory, extracts lightweight context from each file, asks an AI model for better names, and writes organized renamed copies into a separate output directory.
+</p>
+
+## Demo
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2rem;">
+  <img src="https://raw.githubusercontent.com/Vein05/nomnom-data/refs/heads/main/output.gif">
+</div>
+
 
 ## What It Does
 
-- Renames files from a selected directory without modifying the originals
+- Organizes and renames files from a selected directory without modifying the originals
 - Supports preview mode before applying changes
 - Organizes output into category folders when enabled
 - Logs rename sessions to `.nomnom/logs`
@@ -39,17 +61,24 @@ cd nomnom
 go build .
 ```
 
-### Config path
+## Setup
+
+Run the interactive setup wizard:
+
+```bash
+nomnom setup
+```
+
+That will:
+
+- create or update your config file
+- ask for the provider, model, API key, and core defaults
+- offer an optional advanced section
+
+Default config path:
 
 - macOS/Linux: `~/.config/nomnom/config.json`
 - Windows: `%APPDATA%\nomnom\config.json`
-
-Copy the example config first:
-
-```bash
-mkdir -p ~/.config/nomnom
-cp config.example.json ~/.config/nomnom/config.json
-```
 
 ## Config Notes
 
@@ -60,6 +89,7 @@ cp config.example.json ~/.config/nomnom/config.json
   - OpenRouter will use `OPENROUTER_API_KEY`
 - `output` defaults to `<input>/nomnom/renamed`
 - Logs are written under `.nomnom/logs` in the selected input directory
+- Analytics sessions are written under `.nomnom/analytics/sessions`
 
 ## Quick Start
 
@@ -85,13 +115,19 @@ nomnom -d /path/to/files -p images
 Use a custom prompt directly:
 
 ```bash
-nomnom -d /path/to/files -p "Rename papers by topic and venue in snake case."
+nomnom -d /path/to/files -p "Organize and rename papers by topic and venue in snake case."
 ```
 
 Revert a session:
 
 ```bash
 nomnom --revert /path/to/.nomnom/logs/changes_<timestamp>.json
+```
+
+View local analytics:
+
+```bash
+nomnom analytics -d /path/to/files
 ```
 
 ## Flags
@@ -106,6 +142,27 @@ nomnom --revert /path/to/.nomnom/logs/changes_<timestamp>.json
 | `--organize` | `-o` | Organize files by category | `true` |
 | `--prompt` | `-p` | Built-in prompt name or custom prompt text | empty |
 | `--revert` | `-r` | Revert from a log file | empty |
+
+## Setup Command
+
+```bash
+nomnom setup
+nomnom setup -c /custom/path/config.json
+```
+
+## Analytics Command
+
+```bash
+nomnom analytics -d /path/to/files
+```
+
+This prints a local summary from `.nomnom/analytics/sessions`, including:
+
+- session counts
+- rename totals
+- model usage
+- token usage
+- recent sessions
 
 ## Example Config
 
@@ -162,6 +219,7 @@ Some provider integration tests are skipped unless their required environment va
 
 This repository is currently a CLI-first codebase. The core packages are now separated by responsibility:
 
+- `internal/app`
 - `internal/ai`
 - `internal/content`
 - `internal/files`
