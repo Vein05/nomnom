@@ -1,4 +1,4 @@
-package nomnom
+package ai
 
 import (
 	"context"
@@ -13,32 +13,35 @@ import (
 	utils "nomnom/internal/utils"
 
 	"github.com/cohesion-org/deepseek-go"
-	"github.com/fatih/color"
 	api "github.com/ollama/ollama/api"
 )
 
 func SendQueryWithOllama(config configutils.Config, query contentprocessors.Query) (q contentprocessors.Query, err error) {
+	reporter := reporterFor(query)
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
-		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to create client: %v", err))
+		reporter.Errorf("Failed to create client: %v", err)
 		return contentprocessors.Query{}, err
 	}
 
 	model := config.AI.Model
 	if model == "" {
-		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("No model provided", err))
-		return contentprocessors.Query{}, err
+		return contentprocessors.Query{}, fmt.Errorf("no model provided")
 	}
 
-	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("You're using Ollama with model: %s", model))
+	reporter.Infof("You're using Ollama with model: %s", model)
 
 	performanceOpts := config.Performance.AI
 	workers := performanceOpts.Workers
-	timeout := performanceOpts.Timeout
 	retries := performanceOpts.Retries
+	if workers == 0 {
+		workers = 1
+	}
+	if retries == 0 {
+		retries = 1
+	}
 
-	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.GreenString("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d",
-		workers, timeout, retries))
+	reporter.Infof("AI processing configuration - Workers: %d, Retries: %d", workers, retries)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -65,8 +68,7 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 		for range folder.FileList {
 			res := <-results
 			if res.err != nil {
-				fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.RedString("Failed to process file: %s. Error: %v",
-					folder.FileList[res.index].Name, res.err))
+				reporter.Errorf("Failed to process file: %s. Error: %v", folder.FileList[res.index].Name, res.err)
 				folder.FileList[res.index].NewName = res.name
 				continue
 			}
@@ -74,7 +76,7 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 		}
 
 		// Handle retries for failed files in current folder
-		for retryAttempt := range retries {
+		for retryAttempt := 0; retryAttempt < retries; retryAttempt++ {
 			failedIndices := []int{}
 
 			// Identify failed files
@@ -88,8 +90,7 @@ func SendQueryWithOllama(config configutils.Config, query contentprocessors.Quer
 				break
 			}
 
-			fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.YellowString("Retry attempt %d/%d for %d files",
-				retryAttempt+1, retries, len(failedIndices)))
+			reporter.Warnf("Retry attempt %d/%d for %d files", retryAttempt+1, retries, len(failedIndices))
 
 			retryResults := make(chan Result, len(failedIndices))
 
@@ -163,18 +164,17 @@ func removeThink(s string) string {
 	return s
 }
 
-func createMessage(file contentprocessors.File, vision bool, prompt string, context string) []api.Message {
+func createMessage(file contentprocessors.File, vision bool, prompt string, context string, reporter utils.Reporter) []api.Message {
 	if vision && fileutils.IsImageFile(file.Path) {
 		imageData, err := deepseek.ImageToBase64(file.Path) // Depseek-go is used to convert image to base64
-
 		if err != nil {
-			fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to convert image to base64: %s", err))
+			reporter.Errorf("Failed to convert image to base64: %s", err)
 			return nil
 		}
 		base64Str := strings.Split(imageData, ",")[1] // Note to maintainer: Ollama doesn't accpet Base64 header it only accepts the base64 string in []bytes
 		bytes, err := base64.StdEncoding.DecodeString(base64Str)
 		if err != nil {
-			fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Error decoding: %v", err))
+			reporter.Errorf("Error decoding image: %v", err)
 			return nil
 		}
 		return []api.Message{
@@ -208,14 +208,14 @@ func doAIOllama(j int, file *contentprocessors.File, query contentprocessors.Que
 	if prompt == "" {
 		prompt = query.Prompt
 		if prompt == "" {
-			fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("No prompt provided, using default prompt"))
+			reporterFor(query).Warnf("No prompt provided, using default prompt")
 			prompt = "What is the name of this document? Only respond with the name and the extension of the file in snake case. Do not respond with anything else!"
 		}
 	}
 
-	messages := createMessage(*file, fileutils.IsImageFile(file.Path), prompt, file.Context)
+	messages := createMessage(*file, fileutils.IsImageFile(file.Path), prompt, file.Context, reporterFor(query))
 	if len(messages) == 0 {
-		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to create message for file %s", file.Name))
+		reporterFor(query).Errorf("Failed to create message for file %s", file.Name)
 		results <- Result{j, "", fmt.Errorf("failed to create message for file %s", file.Name)}
 		return
 	}
@@ -235,7 +235,7 @@ func doAIOllama(j int, file *contentprocessors.File, query contentprocessors.Que
 	}, response)
 
 	if err != nil {
-		fmt.Printf("%s %s\n", color.RedString("❌"), color.RedString("Failed to process file %s: %v", file.Name, err))
+		reporterFor(query).Errorf("Failed to process file %s: %v", file.Name, err)
 		results <- Result{j, "", fmt.Errorf("error creating chat completion: %v", err)}
 		return
 	}

@@ -1,14 +1,12 @@
-package nomnom
+package ai
 
 import (
 	"fmt"
-	"log"
 
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
 
 	deepseek "github.com/cohesion-org/deepseek-go"
-	"github.com/fatih/color"
 )
 
 // SendQuery sends a query to the deepseek API to generate new file names
@@ -28,7 +26,7 @@ func SendQueryWithDeepSeek(config configutils.Config, query contentprocessors.Qu
 	if model == "" {
 		model = deepseek.DeepSeekChat
 	}
-	fmt.Printf("%s %s\n", color.WhiteString("▶ "), color.WhiteString("You're using Deepseek with model: %s", model))
+	reporterFor(query).Infof("You're using Deepseek with model: %s", model)
 
 	opts := QueryOpts{
 		Model: model,
@@ -45,8 +43,7 @@ func SendQueryWithDeepSeek(config configutils.Config, query contentprocessors.Qu
 		opts.Temperature = config.AI.Temperature
 	}
 
-	if err := SendQueryToLLM(client, query, opts); err != nil {
-		log.Fatalf("error: %v", err)
+	if err := SendQueryToLLM(client, config, query, opts); err != nil {
 		return contentprocessors.Query{}, err
 	}
 
