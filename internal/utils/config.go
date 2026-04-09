@@ -1,14 +1,12 @@
-// Package nomnom contains configuration handling for the nomnom application
-package nomnom
+package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-
-	log "log"
 )
 
 // Config represents the main configuration structure for the application
@@ -80,45 +78,58 @@ type LoggingConfig struct {
 	LogPath string `json:"log_path"` // Path for log files
 }
 
-// LoadConfig loads and parses the configuration file from the specified path
-// If path is empty, it uses default locations based on the operating system
-func LoadConfig(path string, step string) Config {
-	// Check if path is empty and set default based on OS
-	if path == "" {
-		if runtime.GOOS == "windows" {
-			// Windows: Use APPDATA directory for config
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				log.Fatal("❌ Failed to locate APPDATA directory in Windows. Make sure the config file is set.")
-			}
-			path = filepath.Join(appData, "nomnom", "config.json")
-		} else {
-			// Linux/macOS: Use home directory for config
-			home, err := os.UserHomeDir()
-			if err != nil {
-				log.Fatalf("❌ Failed to get user home directory: %v", err)
-			}
-			path = filepath.Join(home, ".config", "nomnom", "config.json")
+// DefaultConfigPath returns the default config path for the current OS.
+func DefaultConfigPath() (string, error) {
+	return ResolveConfigPath("")
+}
+
+// ResolveConfigPath returns the explicit path or the default OS-specific path.
+func ResolveConfigPath(path string) (string, error) {
+	if path != "" {
+		return path, nil
+	}
+
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			return "", errors.New("failed to locate APPDATA directory")
 		}
+		return filepath.Join(appData, "nomnom", "config.json"), nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	return filepath.Join(home, ".config", "nomnom", "config.json"), nil
+}
+
+// LoadConfig loads and parses the configuration file from the specified path.
+// If path is empty, it uses the default location for the current OS.
+func LoadConfig(path string, step string) (Config, error) {
+	resolvedPath, err := ResolveConfigPath(path)
+	if err != nil {
+		return Config{}, err
 	}
 
 	// Print the config file path being loaded
-	fmt.Printf(step+"Loading config from: %s\n", path)
+	fmt.Printf(step+"Loading config from: %s\n", resolvedPath)
 
 	// Read the config file
-	file, err := os.ReadFile(path)
+	file, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Fatalf("❌ Config file not found at %s. Please copy config.example.json to this location and modify it accordingly.", path)
+			return Config{}, fmt.Errorf("config file not found at %s", resolvedPath)
 		}
-		log.Fatalf("❌ Failed to read config file: %v", err)
+		return Config{}, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	// Parse the JSON config file into Config struct
 	var config Config
 	if err := json.Unmarshal(file, &config); err != nil {
-		log.Fatalf("❌ Failed to parse config file: %v", err)
+		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	return config
+	return config, nil
 }
