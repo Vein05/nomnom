@@ -1,4 +1,4 @@
-package nomnom
+package ai
 
 import (
 	"fmt"
@@ -14,10 +14,25 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 	if os.Getenv("OPENROUTER_API_KEY") == "" {
 		t.Skip("OPENROUTER_API_KEY not set, skipping test")
 	}
+	if os.Getenv("OPENROUTER_MODEL") == "" {
+		t.Skip("OPENROUTER_MODEL not set, skipping test")
+	}
 
-	config := configutils.LoadConfig("", "") // Updated path to point to config in main folder
-
-	config.AI.APIKey = os.Getenv("OPENROUTER_API_KEY")
+	config := configutils.Config{
+		AI: configutils.AIConfig{
+			Provider: "openrouter",
+			APIKey:   os.Getenv("OPENROUTER_API_KEY"),
+			Model:    os.Getenv("OPENROUTER_MODEL"),
+			Prompt:   "Rename the file from the content. Return only the filename with extension in snake case.",
+		},
+		Performance: configutils.PerformanceConfig{
+			AI: configutils.PerformanceAIConfig{
+				Workers: 1,
+				Timeout: "30s",
+				Retries: 1,
+			},
+		},
+	}
 
 	// Create a test query with sample data
 	testQuery := contentprocessors.Query{
@@ -48,10 +63,13 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 	}
 
 	// Test the SendQueryWithOpenRouter function
-	SendQueryWithOpenRouter(config, testQuery)
+	result, err := SendQueryWithOpenRouter(config, testQuery)
+	if err != nil {
+		t.Fatalf("SendQueryWithOpenRouter() error = %v", err)
+	}
 
 	// Verify that new names were assigned for all files
-	for i, file := range testQuery.Folders[0].FileList {
+	for i, file := range result.Folders[0].FileList {
 		if file.NewName == "" {
 			t.Errorf("Expected NewName to be set for file %s", file.Name)
 		}
@@ -60,13 +78,14 @@ func TestSendQueryWithOpenRouter(t *testing.T) {
 }
 
 func TestSendQueryWithOpenRouterNoKey(t *testing.T) {
-	config := configutils.LoadConfig("", "")
-	if config.AI.APIKey != "" {
-		t.Logf("API key is set, good to go")
+	config := configutils.Config{
+		AI: configutils.AIConfig{
+			Provider: "openrouter",
+		},
 	}
+
 	_, err := SendQueryWithOpenRouter(config, contentprocessors.Query{})
 	if err == nil {
 		t.Errorf("Expected error when no API key is provided, got nil")
 	}
-
 }
