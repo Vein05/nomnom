@@ -1,4 +1,4 @@
-package nomnom
+package utils
 
 import (
 	"encoding/json"
@@ -39,6 +39,7 @@ type ChangeLog struct {
 // Logger handles logging operations
 type Logger struct {
 	enabled   bool
+	baseDir   string
 	logDir    string
 	sessionID string
 	changeLog *ChangeLog
@@ -52,7 +53,7 @@ func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 	}
 
 	// Create logs directory if it doesn't exist
-	logDir := filepath.Join(baseDir, "nomnom", "logs")
+	logDir := filepath.Join(baseDir, ".nomnom", "logs")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
@@ -62,6 +63,7 @@ func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 
 	logger := &Logger{
 		enabled:   true,
+		baseDir:   baseDir,
 		logDir:    logDir,
 		sessionID: sessionID,
 		logFile:   logFile,
@@ -82,9 +84,11 @@ func (l *Logger) LogOperationWithType(originalPath, newPath string, opType Opera
 	}
 
 	// Get the base directory from the original path
-	baseDir := filepath.Dir(originalPath)
+	baseDir := l.baseDir
+	if baseDir == "" {
+		baseDir = filepath.Dir(originalPath)
+	}
 
-	// Calculate relative path from the base directory
 	relativePath, relErr := filepath.Rel(baseDir, originalPath)
 	if relErr != nil {
 		relativePath = filepath.Base(originalPath)
