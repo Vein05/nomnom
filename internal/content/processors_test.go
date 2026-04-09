@@ -1,4 +1,4 @@
-package nomnom
+package content
 
 import (
 	utils "nomnom/internal/utils"
@@ -46,7 +46,7 @@ func TestNewQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.config, tt.autoApprove, tt.dryRun, tt.log, false)
+			query, err := NewQuery(tt.prompt, tt.dir, tt.configPath, tt.config, tt.autoApprove, tt.dryRun, tt.log, false, utils.NopReporter{}, nil)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewQuery() error = %v, wantErr %v", err, tt.wantErr)
@@ -308,8 +308,7 @@ func TestCopyOrganizedStructure(t *testing.T) {
 	}
 }
 
-func TestHandelPrompt(t *testing.T) {
-	DEFAULT_PROMPT := "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
+func TestResolvePrompt(t *testing.T) {
 	file, err := os.ReadFile(NomNomPrompts[1].TestPath)
 	if err != nil {
 		t.Fatalf("Failed to read image prompt file: %v", err)
@@ -332,7 +331,7 @@ func TestHandelPrompt(t *testing.T) {
 			name:        "Test Empty prompt",
 			prompt:      "",
 			config:      utils.Config{},
-			expected:    DEFAULT_PROMPT,
+			expected:    defaultPrompt,
 			expectedErr: false,
 		},
 
@@ -362,13 +361,23 @@ func TestHandelPrompt(t *testing.T) {
 			expected:    "Custom prompt from config",
 			expectedErr: false,
 		},
+		{
+			name:        "Test Custom prompt argument",
+			prompt:      "Custom prompt",
+			config:      utils.Config{},
+			expected:    "Custom prompt",
+			expectedErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := handelPrompt(tt.prompt, tt.config)
+			result, err := resolvePrompt(tt.prompt, tt.config)
+			if (err != nil) != tt.expectedErr {
+				t.Fatalf("resolvePrompt() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
 			if result != tt.expected {
-				t.Errorf("HandlePrompt() = %v, expected %v", result, tt.expected)
+				t.Errorf("resolvePrompt() = %v, expected %v", result, tt.expected)
 			}
 		})
 	}
