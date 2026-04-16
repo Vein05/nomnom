@@ -9,13 +9,14 @@
       "enabled": true,
       "max_image_size": "10MB"
     },
-    "max_tokens": 1000,
-    "temperature": 0.7,
+    "max_tokens": 128,
+    "temperature": 0.2,
     "prompt": "You are a helpful assistant that renames files based on the content of the file. You will be given a file name and a description of the file. You will need to rename the file based on the description. Make sure the names make sense and is in snake case. Do not include any other text in the name and extension. NEVER CHANGE THE EXTENSION FROM THE ORIGINAL. "
   },
   "file_handling": {
     "max_size": "100MB",
-    "auto_approve": false
+    "auto_approve": false,
+    "move_files": false
   },
   "content_extraction": {
     "extract_text": true,
