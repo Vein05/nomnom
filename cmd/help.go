@@ -56,6 +56,9 @@ Flags:
 	rootCmd.Flags().BoolVarP(&cmdArgs.organize, "organize", "o", true,
 		color.CyanString("Organize files into folders based on content"))
 
+	rootCmd.Flags().BoolVarP(&cmdArgs.moveFiles, "move-files", "m", false,
+		color.CyanString("Move files instead of copy mode (overrides config when set)"))
+
 	rootCmd.Flags().StringVarP(&cmdArgs.prompt, "prompt", "p", "",
 		color.CyanString("Custom AI prompt (use 'research' or 'images' for built-in prompts)"))
 
