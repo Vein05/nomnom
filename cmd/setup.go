@@ -153,13 +153,13 @@ func runAdvancedSetup(config *utils.Config) error {
 	}
 	config.Output = output
 
-	maxTokens, err := promptInt("Max tokens", config.AI.MaxTokens)
+	maxTokens, err := promptInt("Max output tokens per rename response", config.AI.MaxTokens)
 	if err != nil {
 		return err
 	}
 	config.AI.MaxTokens = maxTokens
 
-	temperature, err := promptFloat("Temperature", config.AI.Temperature)
+	temperature, err := promptFloat("Temperature (0 = deterministic, 2 = creative)", config.AI.Temperature)
 	if err != nil {
 		return err
 	}
@@ -188,6 +188,12 @@ func runAdvancedSetup(config *utils.Config) error {
 		return err
 	}
 	config.FileHandling.AutoApprove = autoApprove
+
+	moveFiles, err := promptBool("Move files instead of copy mode?", config.FileHandling.MoveFiles)
+	if err != nil {
+		return err
+	}
+	config.FileHandling.MoveFiles = moveFiles
 
 	customPrompt, err := promptOptionalText("Default custom prompt (leave blank to use NomNom default)", config.AI.Prompt)
 	if err != nil {
@@ -218,12 +224,8 @@ func mergeConfig(base, override utils.Config) utils.Config {
 	if override.AI.Vision.MaxImageSize != "" {
 		base.AI.Vision.MaxImageSize = override.AI.Vision.MaxImageSize
 	}
-	if override.AI.MaxTokens != 0 {
-		base.AI.MaxTokens = override.AI.MaxTokens
-	}
-	if override.AI.Temperature != 0 {
-		base.AI.Temperature = override.AI.Temperature
-	}
+	base.AI.MaxTokens = override.AI.MaxTokens
+	base.AI.Temperature = override.AI.Temperature
 	if override.AI.Prompt != "" {
 		base.AI.Prompt = override.AI.Prompt
 	}
@@ -231,6 +233,7 @@ func mergeConfig(base, override utils.Config) utils.Config {
 		base.FileHandling.MaxSize = override.FileHandling.MaxSize
 	}
 	base.FileHandling.AutoApprove = override.FileHandling.AutoApprove
+	base.FileHandling.MoveFiles = override.FileHandling.MoveFiles
 	if override.ContentExtraction != (utils.ContentExtractionConfig{}) {
 		base.ContentExtraction = override.ContentExtraction
 	}
