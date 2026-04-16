@@ -140,6 +140,7 @@ nomnom analytics -d /path/to/files
 | `--dry-run` | `-n` | Preview only | `true` |
 | `--log` | `-l` | Write session logs | `true` |
 | `--organize` | `-o` | Organize files by category | `true` |
+| `--move-files` | `-m` | Move files (rename) instead of copy mode; overrides config when set | config value |
 | `--prompt` | `-p` | Built-in prompt name or custom prompt text | empty |
 | `--revert` | `-r` | Revert from a log file | empty |
 
@@ -178,13 +179,14 @@ This prints a local summary from `.nomnom/analytics/sessions`, including:
       "enabled": true,
       "max_image_size": "10MB"
     },
-    "max_tokens": 1000,
-    "temperature": 0.7,
+    "max_tokens": 128,
+    "temperature": 0.2,
     "prompt": "You are a helpful assistant that renames files based on file content. Return only the new filename with the original extension in snake case."
   },
   "file_handling": {
     "max_size": "100MB",
-    "auto_approve": false
+    "auto_approve": false,
+    "move_files": false
   },
   "performance": {
     "ai": {
@@ -204,6 +206,11 @@ This prints a local summary from `.nomnom/analytics/sessions`, including:
   }
 }
 ```
+
+Notes:
+
+- `ai.max_tokens` caps output tokens per filename generation request (it is not an input-context limit).
+- `ai.temperature` controls randomness; lower values (for example `0.0` to `0.3`) are usually better for deterministic renaming.
 
 ## Testing
 

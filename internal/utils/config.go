@@ -32,8 +32,8 @@ type AIConfig struct {
 	Model       string       `json:"model"`             // AI model to use
 	APIKey      string       `json:"api_key,omitempty"` // API key for AI service
 	Vision      VisionConfig `json:"vision"`            // Vision processing settings
-	MaxTokens   int          `json:"max_tokens"`        // Maximum tokens for AI responses
-	Temperature float64      `json:"temperature"`       // AI response creativity control
+	MaxTokens   int          `json:"max_tokens"`        // Maximum output tokens per filename generation response
+	Temperature float64      `json:"temperature"`       // Sampling temperature (0 = most deterministic, 2 = most random)
 	Prompt      string       `json:"prompt"`            // Default prompt for AI
 }
 
@@ -41,6 +41,7 @@ type AIConfig struct {
 type FileHandlingConfig struct {
 	MaxSize     string `json:"max_size"`     // Maximum file size allowed
 	AutoApprove bool   `json:"auto_approve"` // Whether to automatically approve files
+	MoveFiles   bool   `json:"move_files"`   // Move files instead of copying when applying the plan
 }
 
 // ContentExtractionConfig specifies content extraction parameters
@@ -90,13 +91,14 @@ func DefaultConfig() Config {
 				Enabled:      true,
 				MaxImageSize: "10MB",
 			},
-			MaxTokens:   1000,
-			Temperature: 0.7,
+			MaxTokens:   128,
+			Temperature: 0.2,
 			Prompt:      "",
 		},
 		FileHandling: FileHandlingConfig{
 			MaxSize:     "100MB",
 			AutoApprove: false,
+			MoveFiles:   false,
 		},
 		ContentExtraction: ContentExtractionConfig{
 			ExtractText:      true,
