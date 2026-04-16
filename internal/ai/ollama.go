@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	content "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
@@ -25,21 +26,30 @@ func SendQueryWithOllama(config configutils.Config, query content.Query) (conten
 		return content.Query{}, fmt.Errorf("no files to process")
 	}
 
-	workers := config.Performance.AI.Workers
-	if workers == 0 {
-		workers = 1
+	workers, retries, timeout, err := aiRuntime(config)
+	if err != nil {
+		return content.Query{}, err
 	}
-	retries := config.Performance.AI.Retries
-	if retries == 0 {
-		retries = 1
-	}
+	genOpts := normalizeQueryOpts(QueryOpts{
+		MaxTokens:   config.AI.MaxTokens,
+		Temperature: config.AI.Temperature,
+	})
 
 	reporterFor(query).Infof("You're using Ollama with model: %s", config.AI.Model)
-	reporterFor(query).Infof("AI processing configuration - Workers: %d, Retries: %d", workers, retries)
+	reporterFor(query).Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d, Max output tokens: %d, Temperature: %.2f", workers, timeout, retries, genOpts.MaxTokens, genOpts.Temperature)
 
-	query.Plan = buildRenamePlan(query.Scan.Files, workers, retries, reporterFor(query), func(file content.ScannedFile, retryHint string) (string, error) {
-		return requestOllamaName(client, config, query, file, retryHint)
-	})
+	query.Plan = buildRenamePlan(
+		query.Scan.Files,
+		workers,
+		retries,
+		reporterFor(query),
+		func(file content.ScannedFile) content.ScannedFile {
+			return prepareFileForLLM(file, config, reporterFor(query))
+		},
+		func(file content.ScannedFile, retryHint string) (string, error) {
+			return requestOllamaName(client, config, query, file, retryHint, genOpts, timeout)
+		},
+	)
 
 	return query, nil
 }
@@ -70,7 +80,7 @@ func removeThink(s string) string {
 	return result
 }
 
-func requestOllamaName(client *api.Client, config configutils.Config, query content.Query, file content.ScannedFile, retryHint string) (string, error) {
+func requestOllamaName(client *api.Client, config configutils.Config, query content.Query, file content.ScannedFile, retryHint string, genOpts QueryOpts, timeout time.Duration) (string, error) {
 	prompt := config.AI.Prompt
 	if prompt == "" {
 		prompt = query.Prompt
@@ -87,10 +97,17 @@ func requestOllamaName(client *api.Client, config configutils.Config, query cont
 	var newName string
 	var lastResponse api.ChatResponse
 	stream := false
-	err = client.Chat(context.Background(), &api.ChatRequest{
+	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	err = client.Chat(reqCtx, &api.ChatRequest{
 		Model:    config.AI.Model,
 		Messages: messages,
 		Stream:   &stream,
+		Options: map[string]any{
+			"num_predict": genOpts.MaxTokens,
+			"temperature": genOpts.Temperature,
+		},
 	}, func(response api.ChatResponse) error {
 		lastResponse = response
 		newName = removeThink(response.Message.Content)

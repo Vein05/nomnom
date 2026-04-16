@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,16 +82,27 @@ func SendQueryToLLM(client *deepseek.Client, config utils.Config, query content.
 		return err
 	}
 
+	opts = normalizeQueryOpts(opts)
+
 	client.Timeout = timeout
 	reporter := reporterFor(query)
-	reporter.Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d", workers, timeout, retries)
+	reporter.Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d, Max output tokens: %d, Temperature: %.2f", workers, timeout, retries, opts.MaxTokens, opts.Temperature)
 
-	plan := buildRenamePlan(query.Scan.Files, workers, retries, reporter, func(file content.ScannedFile, retryHint string) (string, error) {
-		if config.AI.Vision.Enabled && hasVisionSource(file) {
-			return requestVisionName(client, query.Prompt, file, retryHint, opts, query.Analytics)
-		}
-		return requestTextName(client, query.Prompt, file, retryHint, opts, query.Analytics)
-	})
+	plan := buildRenamePlan(
+		query.Scan.Files,
+		workers,
+		retries,
+		reporter,
+		func(file content.ScannedFile) content.ScannedFile {
+			return prepareFileForLLM(file, config, reporter)
+		},
+		func(file content.ScannedFile, retryHint string) (string, error) {
+			if config.AI.Vision.Enabled && hasVisionSource(file) {
+				return requestVisionName(client, query.Prompt, file, retryHint, opts, timeout, query.Analytics)
+			}
+			return requestTextName(client, query.Prompt, file, retryHint, opts, timeout, query.Analytics)
+		},
+	)
 
 	query.Plan = plan
 	return nil
@@ -111,7 +124,7 @@ func aiRuntime(config utils.Config) (workers int, retries int, timeout time.Dura
 		timeoutRaw = "30s"
 	}
 
-	timeout, err = time.ParseDuration(timeoutRaw)
+	timeout, err = parseTimeoutValue(timeoutRaw, "30s")
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("failed to parse timeout: %w", err)
 	}
@@ -119,29 +132,88 @@ func aiRuntime(config utils.Config) (workers int, retries int, timeout time.Dura
 	return workers, retries, timeout, nil
 }
 
-func buildRenamePlan(files []content.ScannedFile, workers, retries int, reporter utils.Reporter, nameFunc func(content.ScannedFile, string) (string, error)) []content.RenamePlanEntry {
+func buildRenamePlan(files []content.ScannedFile, workers, retries int, reporter utils.Reporter, prepareFile func(content.ScannedFile) content.ScannedFile, nameFunc func(content.ScannedFile, string) (string, error)) []content.RenamePlanEntry {
 	results := make([]content.RenamePlanEntry, len(files))
-	sem := make(chan struct{}, workers)
+	if workers <= 0 {
+		workers = 1
+	}
+
+	jobs := make(chan int)
 	var wg sync.WaitGroup
 
-	for index, file := range files {
-		index := index
-		file := file
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			for index := range jobs {
+				file := files[index]
+				if prepareFile != nil {
+					file = prepareFile(file)
+				}
 
-			results[index] = content.RenamePlanEntry{
-				File:          file,
-				SuggestedName: nameWithRetry(file, retries, reporter, nameFunc),
+				results[index] = content.RenamePlanEntry{
+					File:          file,
+					SuggestedName: nameWithRetry(file, retries, reporter, nameFunc),
+				}
 			}
 		}()
 	}
 
+	for index := range files {
+		jobs <- index
+	}
+	close(jobs)
+
 	wg.Wait()
 	return results
+}
+
+func prepareFileForLLM(file content.ScannedFile, config utils.Config, reporter utils.Reporter) content.ScannedFile {
+	if !config.ContentExtraction.ReadContext {
+		return file
+	}
+
+	maxContentLength := config.ContentExtraction.MaxContentLength
+	if maxContentLength <= 0 {
+		maxContentLength = 5000
+	}
+
+	extracted, err := fileutils.ExtractFileContentWithOptions(file.SourcePath, fileutils.ExtractOptions{
+		MaxTextBytes:    int64(maxContentLength),
+		GeneratePreview: config.AI.Vision.Enabled && requiresPreviewExtraction(file),
+	})
+	if err != nil {
+		reporter.Warnf("Failed to lazily extract context for %s: %v", file.SourcePath, err)
+		return file
+	}
+
+	ext := file.Extension
+	if ext == "" {
+		ext = filepath.Ext(file.OriginalName)
+	}
+
+	contentText := strings.TrimSpace(extracted.Text)
+	if contentText == "" {
+		contentText = "No text content extracted."
+	}
+
+	file.Context = fmt.Sprintf("Content: %s\nFile: %s\nExtension Type: %s\nSize: %d bytes", contentText, file.OriginalName, ext, file.Size)
+	file.VisualPath = extracted.PreviewImagePath
+	return file
+}
+
+func requiresPreviewExtraction(file content.ScannedFile) bool {
+	if file.VisualPath != "" || fileutils.IsImageFile(file.SourcePath) {
+		return false
+	}
+
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(file.SourcePath)), ".")
+	switch ext {
+	case "pdf", "docx", "epub", "pptx", "xlsx", "xls":
+		return true
+	default:
+		return false
+	}
 }
 
 func nameWithRetry(file content.ScannedFile, retries int, reporter utils.Reporter, nameFunc func(content.ScannedFile, string) (string, error)) string {
@@ -165,16 +237,21 @@ func nameWithRetry(file content.ScannedFile, retries int, reporter utils.Reporte
 	return ""
 }
 
-func requestTextName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, analytics *utils.AnalyticsStore) (string, error) {
+func requestTextName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, timeout time.Duration, analytics *utils.AnalyticsStore) (string, error) {
 	request := &deepseek.ChatCompletionRequest{
-		Model: opts.Model,
+		Model:       opts.Model,
+		MaxTokens:   opts.MaxTokens,
+		Temperature: float32(opts.Temperature),
 		Messages: []deepseek.ChatCompletionMessage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: prompt},
 			{Role: deepseek.ChatMessageRoleUser, Content: promptContext(file, retryHint)},
 		},
 	}
 
-	response, err := client.CreateChatCompletion(context.Background(), request)
+	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	response, err := client.CreateChatCompletion(reqCtx, request)
 	if err != nil {
 		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
@@ -185,21 +262,26 @@ func requestTextName(client *deepseek.Client, prompt string, file content.Scanne
 	return normalizeSuggestedName(response.Choices[0].Message.Content, file, opts.Case)
 }
 
-func requestVisionName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, analytics *utils.AnalyticsStore) (string, error) {
+func requestVisionName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, timeout time.Duration, analytics *utils.AnalyticsStore) (string, error) {
 	base64Image, err := deepseek.ImageToBase64(visionSourcePath(file))
 	if err != nil {
 		return "", fmt.Errorf("error opening image file: %w", err)
 	}
 
 	request := &deepseek.ChatCompletionRequestWithImage{
-		Model: opts.Model,
+		Model:       opts.Model,
+		MaxTokens:   opts.MaxTokens,
+		Temperature: float32(opts.Temperature),
 		Messages: []deepseek.ChatCompletionMessageWithImage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: prompt},
 			deepseek.NewImageMessage("user", promptContext(file, retryHint), base64Image),
 		},
 	}
 
-	response, err := client.CreateChatCompletionWithImage(context.Background(), request)
+	reqCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	response, err := client.CreateChatCompletionWithImage(reqCtx, request)
 	if err != nil {
 		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
@@ -276,4 +358,38 @@ func recordAnalyticsUsage(analytics *utils.AnalyticsStore, provider, model strin
 		TotalTokens:      totalTokens,
 		Vision:           vision,
 	})
+}
+
+func normalizeQueryOpts(opts QueryOpts) QueryOpts {
+	if opts.MaxTokens <= 1 {
+		opts.MaxTokens = 128
+	}
+	if opts.MaxTokens > 4000 {
+		opts.MaxTokens = 4000
+	}
+
+	if opts.Temperature < 0 || opts.Temperature > 2 {
+		opts.Temperature = 0.2
+	}
+
+	return opts
+}
+
+func parseTimeoutValue(raw, fallback string) (time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = fallback
+	}
+
+	timeout, err := time.ParseDuration(raw)
+	if err == nil {
+		return timeout, nil
+	}
+
+	seconds, convErr := strconv.Atoi(raw)
+	if convErr == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second, nil
+	}
+
+	return 0, err
 }

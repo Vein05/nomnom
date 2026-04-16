@@ -3,6 +3,7 @@ package ai
 import (
 	"os"
 	"testing"
+	"time"
 
 	contentprocessors "nomnom/internal/content"
 	utils "nomnom/internal/utils"
@@ -180,4 +181,22 @@ func TestHandleAIProviderSelection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAIRuntimeParsesNumericTimeoutSeconds(t *testing.T) {
+	config := utils.Config{
+		Performance: utils.PerformanceConfig{
+			AI: utils.PerformanceAIConfig{
+				Workers: 2,
+				Retries: 1,
+				Timeout: "30",
+			},
+		},
+	}
+
+	workers, retries, timeout, err := aiRuntime(config)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, workers)
+	assert.Equal(t, 1, retries)
+	assert.Equal(t, 30*time.Second, timeout)
 }
