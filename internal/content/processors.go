@@ -1,11 +1,13 @@
 package content
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	utils "nomnom/internal/utils"
 
@@ -19,6 +21,7 @@ type QueryParams struct {
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
+	MoveFiles   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -34,6 +37,7 @@ type Query struct {
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
+	MoveFiles   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -60,8 +64,9 @@ type ProcessResult struct {
 }
 
 type SafeProcessor struct {
-	query  *Query
-	output string
+	query       *Query
+	output      string
+	createdDirs map[string]struct{}
 }
 
 type FileTypeCategory struct {
@@ -104,6 +109,7 @@ func NewQuery(params QueryParams) *Query {
 		Dir:         dir,
 		ConfigPath:  params.ConfigPath,
 		AutoApprove: params.AutoApprove,
+		MoveFiles:   params.MoveFiles,
 		DryRun:      params.DryRun,
 		Log:         params.Log,
 		Logger:      params.Logger,
@@ -117,7 +123,7 @@ func NewQuery(params QueryParams) *Query {
 }
 
 func NewSafeProcessor(query *Query, output string) *SafeProcessor {
-	return &SafeProcessor{query: query, output: output}
+	return &SafeProcessor{query: query, output: output, createdDirs: make(map[string]struct{})}
 }
 
 func (p *SafeProcessor) Process() ([]ProcessResult, error) {
@@ -131,15 +137,24 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	if p.query.DryRun {
 		reporter.Infof("Dry run: would create output directory")
 	} else {
-		if err := os.MkdirAll(p.output, 0755); err != nil {
+		if err := p.ensureDir(p.output); err != nil {
 			return nil, fmt.Errorf("failed to create output directory: %w", err)
 		}
 		reporter.Infof("Created output directory: %s", p.output)
 	}
 
+	approvals := make(map[string]utils.ApprovalDecision)
+	if !p.query.DryRun && !p.query.AutoApprove {
+		var err error
+		approvals, err = p.collectApprovals()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	results := make([]ProcessResult, 0, len(p.query.Plan))
 	for _, entry := range p.query.Plan {
-		result, err := p.processEntry(entry)
+		result, err := p.processEntry(entry, approvals)
 		if err != nil {
 			reporter.Errorf("Failed to process %s: %v", entry.File.OriginalName, err)
 		}
@@ -153,7 +168,7 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	return results, nil
 }
 
-func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, error) {
+func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string]utils.ApprovalDecision) (ProcessResult, error) {
 	sourcePath, err := filepath.Abs(entry.File.SourcePath)
 	if err != nil {
 		return ProcessResult{OriginalPath: entry.File.SourcePath, Success: false, Error: err}, err
@@ -191,9 +206,13 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 
 	if !p.query.DryRun {
 		if !p.query.AutoApprove {
-			decision, approveErr := p.promptForRenameApproval(entry.File.OriginalName, filepath.Base(targetPath))
-			if approveErr != nil {
-				return result, approveErr
+			decision, ok := approvals[entry.File.SourcePath]
+			if !ok {
+				var approveErr error
+				decision, approveErr = p.promptForRenameApproval(entry.File.OriginalName, filepath.Base(targetPath))
+				if approveErr != nil {
+					return result, approveErr
+				}
 			}
 			if decision == utils.ApprovalNo {
 				result.Success = false
@@ -205,13 +224,13 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 			}
 		}
 
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		if err := p.ensureDir(filepath.Dir(targetPath)); err != nil {
 			result.Success = false
 			result.Error = err
 			return result, err
 		}
 
-		if err := copyFile(entry.File.SourcePath, targetPath); err != nil {
+		if err := p.writeFile(entry.File.SourcePath, targetPath); err != nil {
 			result.Success = false
 			result.Error = err
 			return result, err
@@ -223,6 +242,31 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 	}
 
 	return result, nil
+}
+
+func (p *SafeProcessor) collectApprovals() (map[string]utils.ApprovalDecision, error) {
+	approvals := make(map[string]utils.ApprovalDecision, len(p.query.Plan))
+
+	for _, entry := range p.query.Plan {
+		if p.query.AutoApprove {
+			break
+		}
+		if entry.SuggestedName == "" {
+			continue
+		}
+
+		decision, err := p.promptForRenameApproval(entry.File.OriginalName, entry.SuggestedName)
+		if err != nil {
+			return nil, err
+		}
+		approvals[entry.File.SourcePath] = decision
+
+		if decision == utils.ApprovalAll {
+			p.query.AutoApprove = true
+		}
+	}
+
+	return approvals, nil
 }
 
 func (p *SafeProcessor) destinationPath(entry RenamePlanEntry) string {
@@ -242,6 +286,45 @@ func (p *SafeProcessor) promptForRenameApproval(oldName, newName string) (utils.
 		return utils.ApprovalNo, fmt.Errorf("no approver configured")
 	}
 	return p.query.Approver.Approve("rename", oldName, newName)
+}
+
+func (p *SafeProcessor) ensureDir(dir string) error {
+	if _, ok := p.createdDirs[dir]; ok {
+		return nil
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	p.createdDirs[dir] = struct{}{}
+	return nil
+}
+
+func (p *SafeProcessor) writeFile(src, dst string) error {
+	if p.query.MoveFiles {
+		return moveOrCopyFile(src, dst)
+	}
+
+	return copyFile(src, dst)
+}
+
+func moveOrCopyFile(src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	} else if !errors.Is(err, syscall.EXDEV) {
+		return fmt.Errorf("failed to move file: %w", err)
+	}
+
+	if err := copyFile(src, dst); err != nil {
+		return err
+	}
+
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("failed to remove source after cross-device copy: %w", err)
+	}
+
+	return nil
 }
 
 func copyFile(src, dst string) error {
