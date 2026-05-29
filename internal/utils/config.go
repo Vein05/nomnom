@@ -9,7 +9,7 @@ import (
 	"runtime"
 )
 
-// Config represents the main configuration structure for the application
+// Config represents the main configuration structure for the application.
 type Config struct {
 	Output            string                  `json:"output"`             // Output directory for processed files
 	Case              string                  `json:"case"`               // Case identifier or name
@@ -20,13 +20,13 @@ type Config struct {
 	Logging           LoggingConfig           `json:"logging"`            // Logging configuration
 }
 
-// VisionConfig holds settings for AI vision capabilities
+// VisionConfig holds settings for AI vision capabilities.
 type VisionConfig struct {
 	Enabled      bool   `json:"enabled"`                  // Whether vision processing is enabled
 	MaxImageSize string `json:"max_image_size,omitempty"` // Maximum allowed image size
 }
 
-// AIConfig contains settings for AI provider integration
+// AIConfig contains settings for AI provider integration.
 type AIConfig struct {
 	Provider    string       `json:"provider"`          // AI service provider name
 	Model       string       `json:"model"`             // AI model to use
@@ -37,14 +37,15 @@ type AIConfig struct {
 	Prompt      string       `json:"prompt"`            // Default prompt for AI
 }
 
-// FileHandlingConfig defines how files are processed
+// FileHandlingConfig defines how files are processed.
 type FileHandlingConfig struct {
-	MaxSize     string `json:"max_size"`     // Maximum file size allowed
-	AutoApprove bool   `json:"auto_approve"` // Whether to automatically approve files
-	MoveFiles   bool   `json:"move_files"`   // Move files instead of copying when applying the plan
+	MaxSize      string `json:"max_size"`       // Maximum file size allowed
+	AutoApprove  bool   `json:"auto_approve"`   // Whether to automatically approve files
+	MoveFiles    bool   `json:"move_files"`     // Move files instead of copying when applying the plan
+	SkipDotFiles bool   `json:"skip_dot_files"` // Whether dotfiles and dot-directories should be skipped during scans
 }
 
-// ContentExtractionConfig specifies content extraction parameters
+// ContentExtractionConfig specifies content extraction parameters.
 type ContentExtractionConfig struct {
 	ExtractText      bool `json:"extract_text"`       // Enable text extraction
 	ExtractMetadata  bool `json:"extract_metadata"`   // Enable metadata extraction
@@ -53,27 +54,27 @@ type ContentExtractionConfig struct {
 	ReadContext      bool `json:"read_context"`       // Enable context reading
 }
 
-// PerformanceConfig holds performance optimization settings
+// PerformanceConfig holds performance optimization settings.
 type PerformanceConfig struct {
 	AI   PerformanceAIConfig   `json:"ai,omitempty"`   // AI processing performance settings
 	File PerformanceFileConfig `json:"file,omitempty"` // File handling performance settings
 }
 
-// PerformanceAIConfig defines AI processing performance parameters
+// PerformanceAIConfig defines AI processing performance parameters.
 type PerformanceAIConfig struct {
 	Workers int    `json:"workers,omitempty"` // Number of AI processing workers
 	Timeout string `json:"timeout,omitempty"` // Timeout for AI operations
 	Retries int    `json:"retries,omitempty"` // Number of retry attempts for AI operations
 }
 
-// PerformanceFileConfig defines file handling performance parameters
+// PerformanceFileConfig defines file handling performance parameters.
 type PerformanceFileConfig struct {
 	Workers int    `json:"workers"`           // Number of file processing workers
 	Timeout string `json:"timeout,omitempty"` // Timeout for file operations
 	Retries int    `json:"retries,omitempty"` // Number of retry attempts for file operations
 }
 
-// LoggingConfig specifies logging settings
+// LoggingConfig specifies logging settings.
 type LoggingConfig struct {
 	Enabled bool   `json:"enabled"`  // Whether logging is enabled
 	LogPath string `json:"log_path"` // Path for log files
@@ -86,7 +87,7 @@ func DefaultConfig() Config {
 		Case:   "snake",
 		AI: AIConfig{
 			Provider: "openrouter",
-			Model:    "google/gemini-2.0-flash-001",
+			Model:    "google/gemini-2.5-flash-lite",
 			Vision: VisionConfig{
 				Enabled:      true,
 				MaxImageSize: "10MB",
@@ -96,9 +97,10 @@ func DefaultConfig() Config {
 			Prompt:      "",
 		},
 		FileHandling: FileHandlingConfig{
-			MaxSize:     "100MB",
-			AutoApprove: false,
-			MoveFiles:   false,
+			MaxSize:      "100MB",
+			AutoApprove:  false,
+			MoveFiles:    false,
+			SkipDotFiles: true,
 		},
 		ContentExtraction: ContentExtractionConfig{
 			ExtractText:      true,
@@ -155,13 +157,12 @@ func ResolveConfigPath(path string) (string, error) {
 
 // LoadConfig loads and parses the configuration file from the specified path.
 // If path is empty, it uses the default location for the current OS.
-func LoadConfig(path string, _ string) (Config, error) {
+func LoadConfig(path string) (Config, error) {
 	resolvedPath, err := ResolveConfigPath(path)
 	if err != nil {
 		return Config{}, err
 	}
 
-	// Read the config file
 	file, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -170,8 +171,7 @@ func LoadConfig(path string, _ string) (Config, error) {
 		return Config{}, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Parse the JSON config file into Config struct
-	var config Config
+	config := DefaultConfig()
 	if err := json.Unmarshal(file, &config); err != nil {
 		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}

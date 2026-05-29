@@ -5,8 +5,6 @@ import (
 
 	content "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
-
-	deepseek "github.com/cohesion-org/deepseek-go"
 )
 
 func SendQueryWithDeepSeek(config configutils.Config, query content.Query) (content.Query, error) {
@@ -14,10 +12,13 @@ func SendQueryWithDeepSeek(config configutils.Config, query content.Query) (cont
 		return content.Query{}, fmt.Errorf("no API key provided for DeepSeek")
 	}
 
-	client := deepseek.NewClient(config.AI.APIKey)
+	client, err := newDeepSeekClient(config.AI.APIKey)
+	if err != nil {
+		return content.Query{}, err
+	}
 	model := config.AI.Model
 	if model == "" {
-		model = deepseek.DeepSeekChat
+		model = "deepseek-chat"
 	}
 
 	opts := QueryOpts{
@@ -29,7 +30,7 @@ func SendQueryWithDeepSeek(config configutils.Config, query content.Query) (cont
 	}
 
 	reporterFor(query).Infof("You're using DeepSeek with model: %s", model)
-	if err := SendQueryToLLM(client, config, query, opts); err != nil {
+	if err := SendQueryToLLM(client, config, &query, opts); err != nil {
 		return content.Query{}, err
 	}
 

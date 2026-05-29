@@ -15,7 +15,7 @@ import (
 )
 
 func SendQueryWithOllama(config configutils.Config, query content.Query) (content.Query, error) {
-	client, err := api.ClientFromEnvironment()
+	client, err := newOllamaClient()
 	if err != nil {
 		return content.Query{}, fmt.Errorf("failed to create client: %w", err)
 	}

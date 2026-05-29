@@ -5,8 +5,6 @@ import (
 
 	content "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
-
-	deepseek "github.com/cohesion-org/deepseek-go"
 )
 
 func SendQueryWithOpenRouter(config configutils.Config, query content.Query) (content.Query, error) {
@@ -17,7 +15,10 @@ func SendQueryWithOpenRouter(config configutils.Config, query content.Query) (co
 		return content.Query{}, fmt.Errorf("no model provided for OpenRouter")
 	}
 
-	client := deepseek.NewClient(config.AI.APIKey, "https://openrouter.ai/api/v1/")
+	client, err := newOpenRouterClient(config.AI.APIKey)
+	if err != nil {
+		return content.Query{}, err
+	}
 	opts := QueryOpts{
 		Provider:    "openrouter",
 		Model:       config.AI.Model,
@@ -27,7 +28,7 @@ func SendQueryWithOpenRouter(config configutils.Config, query content.Query) (co
 	}
 
 	reporterFor(query).Infof("You're using OpenRouter with model: %s", config.AI.Model)
-	if err := SendQueryToLLM(client, config, query, opts); err != nil {
+	if err := SendQueryToLLM(client, config, &query, opts); err != nil {
 		return content.Query{}, err
 	}
 	return query, nil
