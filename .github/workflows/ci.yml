@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: desktop/frontend/package-lock.json
 
       - name: Run root Go tests
         run: go test ./...
@@ -66,8 +64,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: desktop/frontend/package-lock.json
 
       - name: Install Wails CLI
         shell: bash
@@ -147,8 +143,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: desktop/frontend/package-lock.json
 
       - name: Install Wails CLI
         shell: bash
@@ -240,8 +234,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: desktop/frontend/package-lock.json
 
       - name: Install Wails CLI
         shell: bash

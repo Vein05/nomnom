@@ -1,0 +1,7 @@
+build/bin
+node_modules
+frontend/dist
+nomnom-desktop
+nomnom-desktop.exe
+desktop
+desktop.exe
