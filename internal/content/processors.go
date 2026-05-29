@@ -1,12 +1,15 @@
 package content
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 
 	utils "nomnom/internal/utils"
@@ -16,7 +19,12 @@ import (
 
 const defaultPrompt = "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
 
+func DefaultPrompt() string {
+	return defaultPrompt
+}
+
 type QueryParams struct {
+	Context     context.Context
 	Prompt      string
 	Dir         string
 	ConfigPath  string
@@ -33,6 +41,7 @@ type QueryParams struct {
 }
 
 type Query struct {
+	Context     context.Context
 	Prompt      string
 	Dir         string
 	ConfigPath  string
@@ -64,9 +73,10 @@ type ProcessResult struct {
 }
 
 type SafeProcessor struct {
-	query       *Query
-	output      string
-	createdDirs map[string]struct{}
+	query         *Query
+	output        string
+	createdDirs   map[string]struct{}
+	createdDirsMu sync.Mutex
 }
 
 type FileTypeCategory struct {
@@ -98,6 +108,10 @@ func NewQuery(params QueryParams) *Query {
 	if reporter == nil {
 		reporter = utils.NopReporter{}
 	}
+	ctx := params.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	dir := params.Dir
 	if dir == "" {
@@ -105,6 +119,7 @@ func NewQuery(params QueryParams) *Query {
 	}
 
 	return &Query{
+		Context:     ctx,
 		Prompt:      params.Prompt,
 		Dir:         dir,
 		ConfigPath:  params.ConfigPath,
@@ -128,6 +143,9 @@ func NewSafeProcessor(query *Query, output string) *SafeProcessor {
 
 func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	reporter := p.reporter()
+	if err := p.contextErr(); err != nil {
+		return nil, err
+	}
 	reporter.Infof("Starting safe mode processing")
 
 	if len(p.query.Plan) == 0 {
@@ -152,16 +170,52 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 		}
 	}
 
-	results := make([]ProcessResult, 0, len(p.query.Plan))
-	for _, entry := range p.query.Plan {
-		result, err := p.processEntry(entry, approvals)
-		if err != nil {
-			reporter.Errorf("Failed to process %s: %v", entry.File.OriginalName, err)
-		}
-		results = append(results, result)
-		if p.query.Analytics != nil && !p.query.DryRun {
-			p.query.Analytics.RecordRenameResult(result.Success)
-		}
+	results := make([]ProcessResult, len(p.query.Plan))
+	workers := runtime.NumCPU()
+	if workers > len(p.query.Plan) {
+		workers = len(p.query.Plan)
+	}
+
+	jobs := make(chan int, len(p.query.Plan))
+	var wg sync.WaitGroup
+	var completed sync.Mutex
+	done := 0
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for idx := range jobs {
+				if err := p.contextErr(); err != nil {
+					return
+				}
+				entry := p.query.Plan[idx]
+				result, err := p.processEntry(entry, approvals)
+				if err != nil {
+					reporter.Errorf("Failed to process %s: %v", entry.File.OriginalName, err)
+				}
+				results[idx] = result
+				if p.query.Analytics != nil && !p.query.DryRun {
+					p.query.Analytics.RecordRenameResult(result.Success)
+				}
+				completed.Lock()
+				done++
+				currentDone := done
+				completed.Unlock()
+				if progress, ok := reporter.(utils.ProgressReporter); ok {
+					progress.ReportProgress(currentDone, len(p.query.Plan), entry.File.RelativePath)
+				}
+			}
+		}()
+	}
+
+	for i := range p.query.Plan {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	if err := p.contextErr(); err != nil {
+		return results, err
 	}
 
 	reporter.Infof("Completed file processing phase")
@@ -169,6 +223,14 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 }
 
 func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string]utils.ApprovalDecision) (ProcessResult, error) {
+	if err := p.contextErr(); err != nil {
+		return ProcessResult{
+			OriginalPath: entry.File.SourcePath,
+			Success:      false,
+			Error:        err,
+		}, err
+	}
+
 	sourcePath, err := filepath.Abs(entry.File.SourcePath)
 	if err != nil {
 		return ProcessResult{OriginalPath: entry.File.SourcePath, Success: false, Error: err}, err
@@ -230,6 +292,12 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string
 			return result, err
 		}
 
+		if err := p.contextErr(); err != nil {
+			result.Success = false
+			result.Error = err
+			return result, err
+		}
+
 		if err := p.writeFile(entry.File.SourcePath, targetPath); err != nil {
 			result.Success = false
 			result.Error = err
@@ -248,6 +316,9 @@ func (p *SafeProcessor) collectApprovals() (map[string]utils.ApprovalDecision, e
 	approvals := make(map[string]utils.ApprovalDecision, len(p.query.Plan))
 
 	for _, entry := range p.query.Plan {
+		if err := p.contextErr(); err != nil {
+			return nil, err
+		}
 		if p.query.AutoApprove {
 			break
 		}
@@ -289,6 +360,13 @@ func (p *SafeProcessor) promptForRenameApproval(oldName, newName string) (utils.
 }
 
 func (p *SafeProcessor) ensureDir(dir string) error {
+	if err := p.contextErr(); err != nil {
+		return err
+	}
+
+	p.createdDirsMu.Lock()
+	defer p.createdDirsMu.Unlock()
+
 	if _, ok := p.createdDirs[dir]; ok {
 		return nil
 	}
@@ -303,20 +381,24 @@ func (p *SafeProcessor) ensureDir(dir string) error {
 
 func (p *SafeProcessor) writeFile(src, dst string) error {
 	if p.query.MoveFiles {
-		return moveOrCopyFile(src, dst)
+		return moveOrCopyFile(p.context(), src, dst)
 	}
 
-	return copyFile(src, dst)
+	return copyFile(p.context(), src, dst)
 }
 
-func moveOrCopyFile(src, dst string) error {
+func moveOrCopyFile(ctx context.Context, src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
 		return nil
 	} else if !errors.Is(err, syscall.EXDEV) {
 		return fmt.Errorf("failed to move file: %w", err)
 	}
 
-	if err := copyFile(src, dst); err != nil {
+	if err := copyFile(ctx, src, dst); err != nil {
+		return err
+	}
+	if err := contextErr(ctx); err != nil {
+		_ = os.Remove(dst)
 		return err
 	}
 
@@ -327,7 +409,11 @@ func moveOrCopyFile(src, dst string) error {
 	return nil
 }
 
-func copyFile(src, dst string) error {
+func copyFile(ctx context.Context, src, dst string) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+
 	input, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
@@ -338,10 +424,52 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer output.Close()
+	closeOutput := true
+	defer func() {
+		if closeOutput {
+			_ = output.Close()
+		}
+	}()
 
-	if _, err := io.Copy(output, input); err != nil {
-		return fmt.Errorf("failed to copy file contents: %w", err)
+	buffer := make([]byte, 1024*1024)
+	for {
+		if err := contextErr(ctx); err != nil {
+			_ = output.Close()
+			closeOutput = false
+			_ = os.Remove(dst)
+			return err
+		}
+
+		n, readErr := input.Read(buffer)
+		if n > 0 {
+			if _, err := output.Write(buffer[:n]); err != nil {
+				_ = output.Close()
+				closeOutput = false
+				_ = os.Remove(dst)
+				return fmt.Errorf("failed to copy file contents: %w", err)
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			_ = output.Close()
+			closeOutput = false
+			_ = os.Remove(dst)
+			return fmt.Errorf("failed to copy file contents: %w", readErr)
+		}
+	}
+
+	if err := output.Close(); err != nil {
+		closeOutput = false
+		_ = os.Remove(dst)
+		return fmt.Errorf("failed to close destination file: %w", err)
+	}
+	closeOutput = false
+
+	if err := contextErr(ctx); err != nil {
+		_ = os.Remove(dst)
+		return err
 	}
 
 	return nil
@@ -352,6 +480,24 @@ func (p *SafeProcessor) reporter() utils.Reporter {
 		return p.query.Reporter
 	}
 	return utils.NopReporter{}
+}
+
+func (p *SafeProcessor) context() context.Context {
+	if p.query != nil && p.query.Context != nil {
+		return p.query.Context
+	}
+	return context.Background()
+}
+
+func (p *SafeProcessor) contextErr() error {
+	return contextErr(p.context())
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
 }
 
 func categoryForFile(fileName string) string {

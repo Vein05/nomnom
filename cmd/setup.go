@@ -32,7 +32,7 @@ nomnom setup -c ~/.config/nomnom/config.json`,
 
 		config := utils.DefaultConfig()
 		if _, err := os.Stat(resolvedPath); err == nil {
-			existing, loadErr := utils.LoadConfig(resolvedPath, "")
+			existing, loadErr := utils.LoadConfig(resolvedPath)
 			if loadErr != nil {
 				presenter.Warnf("Existing config found at %s but could not be loaded: %v", resolvedPath, loadErr)
 			} else {
@@ -195,6 +195,12 @@ func runAdvancedSetup(config *utils.Config) error {
 	}
 	config.FileHandling.MoveFiles = moveFiles
 
+	skipDotFiles, err := promptBool("Skip dot files and dot directories?", config.FileHandling.SkipDotFiles)
+	if err != nil {
+		return err
+	}
+	config.FileHandling.SkipDotFiles = skipDotFiles
+
 	customPrompt, err := promptOptionalText("Default custom prompt (leave blank to use NomNom default)", config.AI.Prompt)
 	if err != nil {
 		return err
@@ -270,7 +276,7 @@ func modelDefaultForProvider(provider string) string {
 	case "ollama":
 		return "llama3.2"
 	default:
-		return "google/gemini-2.0-flash-001"
+		return "google/gemini-2.5-flash-lite"
 	}
 }
 

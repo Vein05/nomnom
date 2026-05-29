@@ -85,22 +85,16 @@ build_linux "arm64"
 
 echo "🔧 Starting Windows AMD64 build process..."
 
-# Check if cross-compiler is installed
-if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
-    echo -e "${RED}Error: Windows cross-compiler not found${NC}"
-    echo "To install on macOS, run: brew install mingw-w64"
-    exit 1
-fi
-
 # Clean any existing builds
 rm -f nomnom.exe nomnom-windows-amd64.zip
 
-# Build the Windows binary
+# Build the Windows binary without requiring a MinGW CGO toolchain.
+# The document extraction path already falls back at runtime if go-fitz
+# cannot initialize its native backend.
 echo "🔨 Building Windows AMD64 binary..."
-CGO_ENABLED=1 \
+CGO_ENABLED=0 \
 GOOS=windows \
 GOARCH=amd64 \
-CC=x86_64-w64-mingw32-gcc \
 go build -v -o nomnom.exe
 
 # Check if build was successful

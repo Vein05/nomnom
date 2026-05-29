@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,9 +70,12 @@ func HandleAI(config utils.Config, query content.Query) (content.Query, error) {
 	}
 }
 
-func SendQueryToLLM(client *deepseek.Client, config utils.Config, query content.Query, opts QueryOpts) error {
+func SendQueryToLLM(client *deepseek.Client, config utils.Config, query *content.Query, opts QueryOpts) error {
 	if client == nil {
 		return fmt.Errorf("nil client")
+	}
+	if query == nil {
+		return fmt.Errorf("nil query")
 	}
 	if len(query.Scan.Files) == 0 {
 		return fmt.Errorf("no files to process")
@@ -85,7 +89,7 @@ func SendQueryToLLM(client *deepseek.Client, config utils.Config, query content.
 	opts = normalizeQueryOpts(opts)
 
 	client.Timeout = timeout
-	reporter := reporterFor(query)
+	reporter := reporterFor(*query)
 	reporter.Infof("AI processing configuration - Workers: %d, Timeout: %s, Retries: %d, Max output tokens: %d, Temperature: %.2f", workers, timeout, retries, opts.MaxTokens, opts.Temperature)
 
 	plan := buildRenamePlan(
@@ -111,7 +115,7 @@ func SendQueryToLLM(client *deepseek.Client, config utils.Config, query content.
 func aiRuntime(config utils.Config) (workers int, retries int, timeout time.Duration, err error) {
 	workers = config.Performance.AI.Workers
 	if workers == 0 {
-		workers = 1
+		workers = runtime.NumCPU()
 	}
 
 	retries = config.Performance.AI.Retries
@@ -199,6 +203,7 @@ func prepareFileForLLM(file content.ScannedFile, config utils.Config, reporter u
 
 	file.Context = fmt.Sprintf("Content: %s\nFile: %s\nExtension Type: %s\nSize: %d bytes", contentText, file.OriginalName, ext, file.Size)
 	file.VisualPath = extracted.PreviewImagePath
+	file.VisualContent = extracted.VisualContent
 	return file
 }
 
@@ -255,7 +260,7 @@ func requestTextName(client *deepseek.Client, prompt string, file content.Scanne
 	if err != nil {
 		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
-	if response.Choices == nil || len(response.Choices) == 0 {
+	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("no choices in AI response")
 	}
 	recordAnalyticsUsage(analytics, opts.Provider, response.Model, response.Usage.PromptTokens, response.Usage.CompletionTokens, response.Usage.TotalTokens, false)
@@ -263,9 +268,13 @@ func requestTextName(client *deepseek.Client, prompt string, file content.Scanne
 }
 
 func requestVisionName(client *deepseek.Client, prompt string, file content.ScannedFile, retryHint string, opts QueryOpts, timeout time.Duration, analytics *utils.AnalyticsStore) (string, error) {
-	base64Image, err := deepseek.ImageToBase64(visionSourcePath(file))
-	if err != nil {
-		return "", fmt.Errorf("error opening image file: %w", err)
+	base64Image := file.VisualContent
+	if base64Image == "" {
+		var err error
+		base64Image, err = deepseek.ImageToBase64(visionSourcePath(file))
+		if err != nil {
+			return "", fmt.Errorf("error opening image file: %w", err)
+		}
 	}
 
 	request := &deepseek.ChatCompletionRequestWithImage{
@@ -285,7 +294,7 @@ func requestVisionName(client *deepseek.Client, prompt string, file content.Scan
 	if err != nil {
 		return "", fmt.Errorf("error creating chat completion: %w", err)
 	}
-	if response.Choices == nil || len(response.Choices) == 0 {
+	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("no choices in AI response")
 	}
 	recordAnalyticsUsage(analytics, opts.Provider, response.Model, response.Usage.PromptTokens, response.Usage.CompletionTokens, response.Usage.TotalTokens, true)

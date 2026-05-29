@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,14 +23,15 @@ const (
 )
 
 type ScannedFile struct {
-	SourcePath   string `json:"source_path,omitempty"`
-	RelativePath string `json:"relative_path,omitempty"`
-	OriginalName string `json:"original_name,omitempty"`
-	Extension    string `json:"extension,omitempty"`
-	Context      string `json:"context,omitempty"`
-	VisualPath   string `json:"visual_path,omitempty"`
-	Size         int64  `json:"size,omitempty"`
-	Category     string `json:"category,omitempty"`
+	SourcePath    string `json:"source_path,omitempty"`
+	RelativePath  string `json:"relative_path,omitempty"`
+	OriginalName  string `json:"original_name,omitempty"`
+	Extension     string `json:"extension,omitempty"`
+	Context       string `json:"context,omitempty"`
+	VisualPath    string `json:"visual_path,omitempty"`
+	VisualContent string `json:"visual_content,omitempty"`
+	Size          int64  `json:"size,omitempty"`
+	Category      string `json:"category,omitempty"`
 }
 
 type ScanResult struct {
@@ -83,7 +85,7 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 
 	workers := config.Performance.File.Workers
 	if workers == 0 {
-		workers = 1
+		workers = runtime.NumCPU()
 	}
 	timeout, err := parseFileTimeout(config.Performance.File.Timeout, "30s")
 	if err != nil {
@@ -107,7 +109,7 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 	}
 
 	paths := make([]string, 0, len(entries))
-	if err := collectPaths(rootDir, entries, &paths); err != nil {
+	if err := collectPaths(rootDir, entries, &paths, config.FileHandling.SkipDotFiles); err != nil {
 		return ScanResult{}, err
 	}
 
@@ -166,22 +168,25 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 	return result, nil
 }
 
-func collectPaths(root string, entries []os.DirEntry, paths *[]string) error {
+func collectPaths(root string, entries []os.DirEntry, paths *[]string, skipDotFiles bool) error {
 	for _, entry := range entries {
 		fullPath := filepath.Join(root, entry.Name())
 
 		if entry.IsDir() {
+			if skipDotFiles && strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
 			subEntries, err := os.ReadDir(fullPath)
 			if err != nil {
 				return fmt.Errorf("failed to read directory %s: %w", fullPath, err)
 			}
-			if err := collectPaths(fullPath, subEntries, paths); err != nil {
+			if err := collectPaths(fullPath, subEntries, paths, skipDotFiles); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if shouldSkip(entry.Name()) {
+		if shouldSkip(entry.Name(), skipDotFiles) {
 			continue
 		}
 
@@ -191,8 +196,8 @@ func collectPaths(root string, entries []os.DirEntry, paths *[]string) error {
 	return nil
 }
 
-func shouldSkip(name string) bool {
-	return strings.HasPrefix(name, ".") ||
+func shouldSkip(name string, skipDotFiles bool) bool {
+	return (skipDotFiles && strings.HasPrefix(name, ".")) ||
 		strings.HasSuffix(name, "~") ||
 		strings.HasSuffix(name, ".tmp") ||
 		strings.HasSuffix(name, ".swp")

@@ -10,6 +10,7 @@ import (
 )
 
 func Init() {
+	rootCmd.Version = Version
 
 	helpTemplate := color.BlueString(`
 _  _                 _  _                 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 )
 
 type RunOptions struct {
+	Context     context.Context
 	Dir         string
 	ConfigPath  string
 	Prompt      string
@@ -42,11 +44,11 @@ func NewService() Service {
 }
 
 func (Service) LoadConfig(configPath string) (utils.Config, error) {
-	return utils.LoadConfig(configPath, "")
+	return utils.LoadConfig(configPath)
 }
 
 func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver utils.Approver) (*PreparedRun, error) {
-	config, err := utils.LoadConfig(opts.ConfigPath, "")
+	config, err := utils.LoadConfig(opts.ConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +81,7 @@ func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver uti
 	}
 
 	query := content.NewQuery(content.QueryParams{
+		Context:     opts.Context,
 		Prompt:      resolvedPrompt,
 		Dir:         scan.RootDir,
 		ConfigPath:  opts.ConfigPath,
