@@ -31,21 +31,21 @@ jobs:
       - name: Run root Go tests
         run: go test ./...
 
-      - name: Run desktop Go tests
-        working-directory: desktop
-        run: go test ./...
-
       - name: Install frontend dependencies
         working-directory: desktop/frontend
         run: npm ci
 
-      - name: Run frontend tests
-        working-directory: desktop/frontend
-        run: npm test
-
       - name: Build frontend
         working-directory: desktop/frontend
         run: npm run build
+
+      - name: Run desktop Go tests
+        working-directory: desktop
+        run: go test ./...
+
+      - name: Run frontend tests
+        working-directory: desktop/frontend
+        run: npm test
 
   e2e:
     name: E2E Tests (macOS)
