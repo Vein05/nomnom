@@ -36,7 +36,7 @@ async function scanDirectory(page: any, sourceDir: string) {
 async function waitForJobComplete(page: any) {
   await expect(async () => {
     const badge = page.locator("header div.rounded-full").first();
-    await expect(badge).toContainText(/complete|ready/i, { timeout: 5_000 });
+    await expect(badge).toContainText(/Complete/i, { timeout: 5_000 });
   }).toPass({ timeout: 120_000 });
 }
 
