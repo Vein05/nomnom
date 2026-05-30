@@ -26,6 +26,8 @@ function isComparisonPreview(state?: string) {
 
 function formatJobState(state?: string) {
   switch (state) {
+    case "generating":
+      return "Thinking...";
     case "preview-ready":
     case "ready":
       return "Ready";

@@ -62,8 +62,12 @@ export function useJob() {
     return canceled;
   }, [jobID, refreshSnapshotFor]);
 
+  const isRunning = useCallback((state?: string) => {
+    return state === "generating" || state === "preview-ready" || state === "running";
+  }, []);
+
   useEffect(() => {
-    if (!jobID || status?.state !== "running") {
+    if (!jobID || !isRunning(status?.state)) {
       return undefined;
     }
 
@@ -72,7 +76,7 @@ export function useJob() {
       void (async () => {
         try {
           const nextStatus = await refreshSnapshotFor(jobID);
-          if (!active || nextStatus.state === "running") {
+          if (!active || isRunning(nextStatus.state)) {
             return;
           }
           window.clearInterval(interval);
@@ -86,7 +90,7 @@ export function useJob() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [jobID, refreshSnapshotFor, status?.state]);
+  }, [jobID, refreshSnapshotFor, isRunning, status?.state]);
 
   return {
     jobID,
