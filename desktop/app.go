@@ -65,11 +65,11 @@ func (r jobReporter) ReportProgress(done, total int, currentFile string) {
 }
 
 type App struct {
-	ctx             context.Context
-	mu              sync.RWMutex
-	jobs            map[string]*jobState
-	configPath      string
-	lastHistoryErr  string
+	ctx            context.Context
+	mu             sync.RWMutex
+	jobs           map[string]*jobState
+	configPath     string
+	lastHistoryErr string
 }
 
 func NewApp() *App {
@@ -328,13 +328,13 @@ func (a *App) ScanDirectory(path string) (string, error) {
 
 	jobID := newJobID()
 	status := JobStatus{
-		JobID:   jobID,
-		State:   "files-ready",
-		Done:    0,
-		Total:   len(entries),
-		Message: fmt.Sprintf("%d files found", len(entries)),
+		JobID:     jobID,
+		State:     "files-ready",
+		Done:      0,
+		Total:     len(entries),
+		Message:   fmt.Sprintf("%d files found", len(entries)),
 		Summary:   JobSummary{Planned: len(entries)},
-			OutputDir: outputDir,
+		OutputDir: outputDir,
 	}
 
 	a.mu.Lock()

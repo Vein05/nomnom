@@ -12,7 +12,7 @@ env:
 
 jobs:
   validate:
-    name: Validate Tests And Frontend Build
+    name: Validate (Tests, Lint, Build)
     runs-on: ubuntu-latest
 
     steps:
@@ -21,12 +21,31 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Run gofmt (root)
+        run: |
+          files=$(find . -path ./desktop -prune -o -name '*.go' -print)
+          out=$(gofmt -l $files)
+          if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
+
+      - name: Run gofmt (desktop)
+        run: |
+          files=$(find desktop -path desktop/frontend/wailsjs -prune -o -name '*.go' -print)
+          out=$(gofmt -l $files)
+          if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
+
+      - name: Run go vet (root)
+        run: go vet ./...
+
+      - name: Run go vet (desktop)
+        working-directory: desktop
+        run: go vet ./...
 
       - name: Run root Go tests
         run: go test ./...
@@ -51,6 +70,7 @@ jobs:
     name: E2E Tests (macOS)
     runs-on: macos-latest
     timeout-minutes: 20
+    if: github.event_name != 'push'
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +78,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -102,7 +122,6 @@ jobs:
         run: |
           wails dev &
           echo "WAILS_PID=$!" >> "$GITHUB_ENV"
-          # Wait for the dev server to be ready
           for i in $(seq 1 60); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:34115 | grep -q "200\|302\|304"; then
               echo "Wails dev ready after ${i}s"
@@ -130,6 +149,7 @@ jobs:
     name: E2E Tests (Windows)
     runs-on: windows-latest
     timeout-minutes: 20
+    if: github.event_name != 'push'
 
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +157,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -228,7 +248,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Set up Node
         uses: actions/setup-node@v4
