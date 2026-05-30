@@ -34,21 +34,8 @@ jobs:
           out=$(gofmt -l $files)
           if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
 
-      - name: Run gofmt (desktop)
-        run: |
-          files=$(find desktop -path desktop/frontend/wailsjs -prune -o -name '*.go' -print)
-          out=$(gofmt -l $files)
-          if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
-
       - name: Run go vet (root)
         run: go vet ./...
-
-      - name: Run go vet (desktop)
-        working-directory: desktop
-        run: go vet ./...
-
-      - name: Run root Go tests
-        run: go test ./...
 
       - name: Install frontend dependencies
         working-directory: desktop/frontend
@@ -57,6 +44,19 @@ jobs:
       - name: Build frontend
         working-directory: desktop/frontend
         run: npm run build
+
+      - name: Run gofmt (desktop)
+        run: |
+          files=$(find desktop -path desktop/frontend/wailsjs -prune -o -name '*.go' -print)
+          out=$(gofmt -l $files)
+          if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
+
+      - name: Run go vet (desktop)
+        working-directory: desktop
+        run: go vet ./...
+
+      - name: Run root Go tests
+        run: go test ./...
 
       - name: Run desktop Go tests
         working-directory: desktop
