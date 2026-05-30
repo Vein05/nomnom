@@ -111,10 +111,12 @@ jobs:
       - name: Create macOS DMG
         if: runner.os == 'macOS'
         run: |
-          hdiutil create -volname "nomnom" \
-            -srcfolder desktop/build/bin/nomnom-desktop.app \
-            -ov -format UDZO \
-            ${{ matrix.asset_name }}
+          hdiutil create -size 80m -volname "nomnom" -fs "APFS" -ov /tmp/nomnom-temp.dmg
+          hdiutil attach /tmp/nomnom-temp.dmg -nobrowse
+          cp -R desktop/build/bin/nomnom-desktop.app /Volumes/nomnom/
+          ln -s /Applications /Volumes/nomnom/
+          hdiutil detach /Volumes/nomnom/
+          hdiutil convert /tmp/nomnom-temp.dmg -format UDZO -o ${{ matrix.asset_name }}
 
       - name: Archive Windows desktop binary
         if: runner.os == 'Windows'
