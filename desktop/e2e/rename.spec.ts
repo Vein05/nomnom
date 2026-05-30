@@ -103,6 +103,8 @@ test.describe("Rename workflow", () => {
     // The plan is populated with AI-renamed names during the run.
     await page.getByRole("button", { name: /run/i }).click();
     await waitForJobComplete(page);
+    // Let the file browser re-render with the comparison view.
+    await page.waitForTimeout(500);
 
     const expectedRenames: Record<string, string> = {
       "Quarterly Business Report.pdf": "quarterly_business_report.pdf",
