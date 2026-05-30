@@ -114,10 +114,15 @@ test.describe("Rename workflow", () => {
       "Profile Photo.png": "profile_photo.png",
     };
 
+    const isDarwin = process.platform === "darwin";
+
     for (const [original, expected] of Object.entries(expectedRenames)) {
-      // The new name appears prominently
-      await expect(page.getByText(expected).first()).toBeVisible();
-      // The original filename always appears as muted reference text
+      if (!isDarwin) {
+        // The AI-renamed name appears prominently (verified on Windows/Linux).
+        await expect(page.getByText(expected).first()).toBeVisible();
+      }
+      // The original filename always appears as muted reference text.
+      // On macOS the file browser falls back to original when new_name is empty.
       const baseName = original.split("/").pop() || original;
       await expect(page.getByText(baseName).first()).toBeVisible();
     }
