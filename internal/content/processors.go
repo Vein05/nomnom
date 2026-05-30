@@ -1,11 +1,16 @@
 package content
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 
 	utils "nomnom/internal/utils"
 
@@ -14,11 +19,17 @@ import (
 
 const defaultPrompt = "You are a desktop organizer that creates nice names for the files with their context. Please follow snake case naming convention. Only respond with the new name and the file extension. Do not change the file extension."
 
+func DefaultPrompt() string {
+	return defaultPrompt
+}
+
 type QueryParams struct {
+	Context     context.Context
 	Prompt      string
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
+	MoveFiles   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -30,10 +41,12 @@ type QueryParams struct {
 }
 
 type Query struct {
+	Context     context.Context
 	Prompt      string
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
+	MoveFiles   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -60,8 +73,10 @@ type ProcessResult struct {
 }
 
 type SafeProcessor struct {
-	query  *Query
-	output string
+	query         *Query
+	output        string
+	createdDirs   map[string]struct{}
+	createdDirsMu sync.Mutex
 }
 
 type FileTypeCategory struct {
@@ -93,6 +108,10 @@ func NewQuery(params QueryParams) *Query {
 	if reporter == nil {
 		reporter = utils.NopReporter{}
 	}
+	ctx := params.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	dir := params.Dir
 	if dir == "" {
@@ -100,10 +119,12 @@ func NewQuery(params QueryParams) *Query {
 	}
 
 	return &Query{
+		Context:     ctx,
 		Prompt:      params.Prompt,
 		Dir:         dir,
 		ConfigPath:  params.ConfigPath,
 		AutoApprove: params.AutoApprove,
+		MoveFiles:   params.MoveFiles,
 		DryRun:      params.DryRun,
 		Log:         params.Log,
 		Logger:      params.Logger,
@@ -117,11 +138,14 @@ func NewQuery(params QueryParams) *Query {
 }
 
 func NewSafeProcessor(query *Query, output string) *SafeProcessor {
-	return &SafeProcessor{query: query, output: output}
+	return &SafeProcessor{query: query, output: output, createdDirs: make(map[string]struct{})}
 }
 
 func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	reporter := p.reporter()
+	if err := p.contextErr(); err != nil {
+		return nil, err
+	}
 	reporter.Infof("Starting safe mode processing")
 
 	if len(p.query.Plan) == 0 {
@@ -131,29 +155,82 @@ func (p *SafeProcessor) Process() ([]ProcessResult, error) {
 	if p.query.DryRun {
 		reporter.Infof("Dry run: would create output directory")
 	} else {
-		if err := os.MkdirAll(p.output, 0755); err != nil {
+		if err := p.ensureDir(p.output); err != nil {
 			return nil, fmt.Errorf("failed to create output directory: %w", err)
 		}
 		reporter.Infof("Created output directory: %s", p.output)
 	}
 
-	results := make([]ProcessResult, 0, len(p.query.Plan))
-	for _, entry := range p.query.Plan {
-		result, err := p.processEntry(entry)
+	approvals := make(map[string]utils.ApprovalDecision)
+	if !p.query.DryRun && !p.query.AutoApprove {
+		var err error
+		approvals, err = p.collectApprovals()
 		if err != nil {
-			reporter.Errorf("Failed to process %s: %v", entry.File.OriginalName, err)
+			return nil, err
 		}
-		results = append(results, result)
-		if p.query.Analytics != nil && !p.query.DryRun {
-			p.query.Analytics.RecordRenameResult(result.Success)
-		}
+	}
+
+	results := make([]ProcessResult, len(p.query.Plan))
+	workers := runtime.NumCPU()
+	if workers > len(p.query.Plan) {
+		workers = len(p.query.Plan)
+	}
+
+	jobs := make(chan int, len(p.query.Plan))
+	var wg sync.WaitGroup
+	var completed sync.Mutex
+	done := 0
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for idx := range jobs {
+				if err := p.contextErr(); err != nil {
+					return
+				}
+				entry := p.query.Plan[idx]
+				result, err := p.processEntry(entry, approvals)
+				if err != nil {
+					reporter.Errorf("Failed to process %s: %v", entry.File.OriginalName, err)
+				}
+				results[idx] = result
+				if p.query.Analytics != nil && !p.query.DryRun {
+					p.query.Analytics.RecordRenameResult(result.Success)
+				}
+				completed.Lock()
+				done++
+				currentDone := done
+				completed.Unlock()
+				if progress, ok := reporter.(utils.ProgressReporter); ok {
+					progress.ReportProgress(currentDone, len(p.query.Plan), entry.File.RelativePath)
+				}
+			}
+		}()
+	}
+
+	for i := range p.query.Plan {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	if err := p.contextErr(); err != nil {
+		return results, err
 	}
 
 	reporter.Infof("Completed file processing phase")
 	return results, nil
 }
 
-func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, error) {
+func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string]utils.ApprovalDecision) (ProcessResult, error) {
+	if err := p.contextErr(); err != nil {
+		return ProcessResult{
+			OriginalPath: entry.File.SourcePath,
+			Success:      false,
+			Error:        err,
+		}, err
+	}
+
 	sourcePath, err := filepath.Abs(entry.File.SourcePath)
 	if err != nil {
 		return ProcessResult{OriginalPath: entry.File.SourcePath, Success: false, Error: err}, err
@@ -191,9 +268,13 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 
 	if !p.query.DryRun {
 		if !p.query.AutoApprove {
-			decision, approveErr := p.promptForRenameApproval(entry.File.OriginalName, filepath.Base(targetPath))
-			if approveErr != nil {
-				return result, approveErr
+			decision, ok := approvals[entry.File.SourcePath]
+			if !ok {
+				var approveErr error
+				decision, approveErr = p.promptForRenameApproval(entry.File.OriginalName, filepath.Base(targetPath))
+				if approveErr != nil {
+					return result, approveErr
+				}
 			}
 			if decision == utils.ApprovalNo {
 				result.Success = false
@@ -205,13 +286,19 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 			}
 		}
 
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		if err := p.ensureDir(filepath.Dir(targetPath)); err != nil {
 			result.Success = false
 			result.Error = err
 			return result, err
 		}
 
-		if err := copyFile(entry.File.SourcePath, targetPath); err != nil {
+		if err := p.contextErr(); err != nil {
+			result.Success = false
+			result.Error = err
+			return result, err
+		}
+
+		if err := p.writeFile(entry.File.SourcePath, targetPath); err != nil {
 			result.Success = false
 			result.Error = err
 			return result, err
@@ -223,6 +310,34 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry) (ProcessResult, erro
 	}
 
 	return result, nil
+}
+
+func (p *SafeProcessor) collectApprovals() (map[string]utils.ApprovalDecision, error) {
+	approvals := make(map[string]utils.ApprovalDecision, len(p.query.Plan))
+
+	for _, entry := range p.query.Plan {
+		if err := p.contextErr(); err != nil {
+			return nil, err
+		}
+		if p.query.AutoApprove {
+			break
+		}
+		if entry.SuggestedName == "" {
+			continue
+		}
+
+		decision, err := p.promptForRenameApproval(entry.File.OriginalName, entry.SuggestedName)
+		if err != nil {
+			return nil, err
+		}
+		approvals[entry.File.SourcePath] = decision
+
+		if decision == utils.ApprovalAll {
+			p.query.AutoApprove = true
+		}
+	}
+
+	return approvals, nil
 }
 
 func (p *SafeProcessor) destinationPath(entry RenamePlanEntry) string {
@@ -244,7 +359,61 @@ func (p *SafeProcessor) promptForRenameApproval(oldName, newName string) (utils.
 	return p.query.Approver.Approve("rename", oldName, newName)
 }
 
-func copyFile(src, dst string) error {
+func (p *SafeProcessor) ensureDir(dir string) error {
+	if err := p.contextErr(); err != nil {
+		return err
+	}
+
+	p.createdDirsMu.Lock()
+	defer p.createdDirsMu.Unlock()
+
+	if _, ok := p.createdDirs[dir]; ok {
+		return nil
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	p.createdDirs[dir] = struct{}{}
+	return nil
+}
+
+func (p *SafeProcessor) writeFile(src, dst string) error {
+	if p.query.MoveFiles {
+		return moveOrCopyFile(p.context(), src, dst)
+	}
+
+	return copyFile(p.context(), src, dst)
+}
+
+func moveOrCopyFile(ctx context.Context, src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	} else if !errors.Is(err, syscall.EXDEV) {
+		return fmt.Errorf("failed to move file: %w", err)
+	}
+
+	if err := copyFile(ctx, src, dst); err != nil {
+		return err
+	}
+	if err := contextErr(ctx); err != nil {
+		_ = os.Remove(dst)
+		return err
+	}
+
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("failed to remove source after cross-device copy: %w", err)
+	}
+
+	return nil
+}
+
+func copyFile(ctx context.Context, src, dst string) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+
 	input, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
@@ -255,10 +424,52 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer output.Close()
+	closeOutput := true
+	defer func() {
+		if closeOutput {
+			_ = output.Close()
+		}
+	}()
 
-	if _, err := io.Copy(output, input); err != nil {
-		return fmt.Errorf("failed to copy file contents: %w", err)
+	buffer := make([]byte, 1024*1024)
+	for {
+		if err := contextErr(ctx); err != nil {
+			_ = output.Close()
+			closeOutput = false
+			_ = os.Remove(dst)
+			return err
+		}
+
+		n, readErr := input.Read(buffer)
+		if n > 0 {
+			if _, err := output.Write(buffer[:n]); err != nil {
+				_ = output.Close()
+				closeOutput = false
+				_ = os.Remove(dst)
+				return fmt.Errorf("failed to copy file contents: %w", err)
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			_ = output.Close()
+			closeOutput = false
+			_ = os.Remove(dst)
+			return fmt.Errorf("failed to copy file contents: %w", readErr)
+		}
+	}
+
+	if err := output.Close(); err != nil {
+		closeOutput = false
+		_ = os.Remove(dst)
+		return fmt.Errorf("failed to close destination file: %w", err)
+	}
+	closeOutput = false
+
+	if err := contextErr(ctx); err != nil {
+		_ = os.Remove(dst)
+		return err
 	}
 
 	return nil
@@ -269,6 +480,24 @@ func (p *SafeProcessor) reporter() utils.Reporter {
 		return p.query.Reporter
 	}
 	return utils.NopReporter{}
+}
+
+func (p *SafeProcessor) context() context.Context {
+	if p.query != nil && p.query.Context != nil {
+		return p.query.Context
+	}
+	return context.Background()
+}
+
+func (p *SafeProcessor) contextErr() error {
+	return contextErr(p.context())
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
 }
 
 func categoryForFile(fileName string) string {

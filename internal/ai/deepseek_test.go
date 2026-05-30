@@ -1,63 +1,67 @@
 package ai
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	contentprocessors "nomnom/internal/content"
 	configutils "nomnom/internal/utils"
+
+	deepseek "github.com/cohesion-org/deepseek-go"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSendQuery(t *testing.T) {
-	// Skip test if DEEPSEEK_API_KEY is not set
-	if os.Getenv("DEEPSEEK_API_KEY") == "" {
-		t.Skip("DEEPSEEK_API_KEY not set, skipping test")
-	}
+func TestSendQueryWithDeepSeekMockServer(t *testing.T) {
+	server, getRecords := newDeepSeekMockServer("renamed_document")
+	defer server.Close()
 
-	// Set up test configuration
+	originalFactory := newDeepSeekClient
+	newDeepSeekClient = func(apiKey string) (*deepseek.Client, error) {
+		return deepseek.NewClientWithOptions(apiKey, deepseek.WithBaseURL(server.URL+"/"))
+	}
+	t.Cleanup(func() {
+		newDeepSeekClient = originalFactory
+	})
+
 	config := configutils.Config{
 		AI: configutils.AIConfig{
-			APIKey: os.Getenv("DEEPSEEK_API_KEY"),
+			Provider: "deepseek",
+			APIKey:   "test-api-key",
+			Model:    "mock-deepseek-model",
+			Prompt:   "Rename files from their content.",
 		},
-	}
-
-	// Create a test query with sample data
-	testQuery := contentprocessors.Query{
-		Prompt: "What is the title of this document? Only respond with the title and extension in snake case.",
-		Scan: contentprocessors.ScanResult{
-			RootDir: "/test/path",
-			Files: []contentprocessors.ScannedFile{
-				{
-					SourcePath:   "/test/path/test_file.txt",
-					RelativePath: "test_file.txt",
-					OriginalName: "test_file.txt",
-					Context:      "This is a test file containing important information about a game called Rain World.",
-				},
-				{
-					SourcePath:   "/test/path/presentation.ppt",
-					RelativePath: "presentation.ppt",
-					OriginalName: "presentation.ppt",
-					Context:      "This is a PowerPoint presentation about quarterly sales results for Q1 2024.",
-				},
-				{
-					SourcePath:   "/test/path/report.pdf",
-					RelativePath: "report.pdf",
-					OriginalName: "report.pdf",
-					Context:      "This is the annual financial report for 2023 fiscal year with detailed analysis.",
-				},
+		Performance: configutils.PerformanceConfig{
+			AI: configutils.PerformanceAIConfig{
+				Workers: 1,
+				Timeout: "2s",
+				Retries: 1,
 			},
 		},
 	}
 
-	// Test the SendQuery function
-	SendQueryWithDeepSeek(config, testQuery)
-
-	// Verify that new names were assigned for all files
-	for i, entry := range testQuery.Plan {
-		if entry.SuggestedName == "" {
-			t.Errorf("Expected SuggestedName to be set for file %s", entry.File.OriginalName)
-		}
-		fmt.Printf("File %d - Old Name: %s, New Name: %s\n", i+1, entry.File.OriginalName, entry.SuggestedName)
+	query := contentprocessors.Query{
+		Prompt: config.AI.Prompt,
+		Scan: contentprocessors.ScanResult{
+			RootDir: "/tmp/mock",
+			Files: []contentprocessors.ScannedFile{
+				{SourcePath: "/tmp/mock/a.txt", RelativePath: "a.txt", OriginalName: "a.txt", Context: "alpha"},
+				{SourcePath: "/tmp/mock/b.txt", RelativePath: "b.txt", OriginalName: "b.txt", Context: "beta"},
+			},
+		},
 	}
+
+	result, err := SendQueryWithDeepSeek(config, query)
+	if err != nil {
+		t.Fatalf("SendQueryWithDeepSeek() error = %v", err)
+	}
+
+	records := getRecords()
+	assert.Len(t, records, 2)
+	for _, record := range records {
+		assert.Equal(t, "/chat/completions", record.Path)
+		assert.Equal(t, "mock-deepseek-model", record.Request.Model)
+		assert.Len(t, record.Request.Messages, 2)
+	}
+
+	assert.Equal(t, "renamed_document.txt", result.Plan[0].SuggestedName)
+	assert.Equal(t, "renamed_document.txt", result.Plan[1].SuggestedName)
 }

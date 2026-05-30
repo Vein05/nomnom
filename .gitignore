@@ -2,6 +2,7 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+node_modules/
 *.exe
 *.exe~
 *.dll
@@ -40,3 +41,12 @@ demo/
 nomnom
 windows.sh
 *.zip
+desktop/frontend/.vite/
+
+# Playwright e2e output
+desktop/e2e/test-results/
+desktop/e2e/playwright-report/
+desktop/e2e/playwright/.cache/
+.e2e-output/
+
+ui.md

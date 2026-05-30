@@ -2,19 +2,33 @@ package files
 
 import (
 	"fmt"
-	"image/jpeg"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dhowden/tag"
-	"github.com/gen2brain/go-fitz"
 )
 
 type ExtractedContent struct {
 	Text             string
 	PreviewImagePath string
+	VisualContent    string
+}
+
+type ExtractOptions struct {
+	MaxTextBytes    int64
+	GeneratePreview bool
+}
+
+const defaultExtractTextLimit int64 = 32 * 1024
+
+var previewTempDir struct {
+	once sync.Once
+	dir  string
+	err  error
 }
 
 func ReadFile(path string) (string, error) {
@@ -26,11 +40,22 @@ func ReadFile(path string) (string, error) {
 }
 
 func ExtractFileContent(path string) (ExtractedContent, error) {
+	return ExtractFileContentWithOptions(path, ExtractOptions{
+		MaxTextBytes:    defaultExtractTextLimit,
+		GeneratePreview: true,
+	})
+}
+
+func ExtractFileContentWithOptions(path string, opts ExtractOptions) (ExtractedContent, error) {
+	if opts.MaxTextBytes <= 0 {
+		opts.MaxTextBytes = defaultExtractTextLimit
+	}
+
 	extension := strings.TrimPrefix(GetFileExtension(path), ".")
 
 	switch extension {
 	case "txt", "md", "json":
-		content, err := readRawFile(path)
+		content, err := readRawFile(path, opts.MaxTextBytes)
 		if err != nil {
 			return ExtractedContent{}, fmt.Errorf("there was an error reading the file %s: %w", path, err)
 		}
@@ -42,7 +67,7 @@ func ExtractFileContent(path string) (ExtractedContent, error) {
 		}
 		return ExtractedContent{Text: text, PreviewImagePath: path}, nil
 	case "pdf", "docx", "epub", "pptx", "xlsx", "xls":
-		return readDocumentContent(path)
+		return readDocumentContent(path, opts)
 	case "mp3", "ogg", "mp4", "flac", "m4a", "dsf", "wav":
 		text, err := readMetadata(path)
 		if err != nil {
@@ -50,19 +75,26 @@ func ExtractFileContent(path string) (ExtractedContent, error) {
 		}
 		return ExtractedContent{Text: text}, nil
 	default:
-		content, err := os.ReadFile(path)
+		content, err := readRawFile(path, opts.MaxTextBytes)
 		if err != nil {
 			return ExtractedContent{}, fmt.Errorf("there was an error reading the file %s: %w", path, err)
 		}
-		return ExtractedContent{Text: string(content)}, nil
+		return ExtractedContent{Text: content}, nil
 	}
 }
 
-func readRawFile(path string) (string, error) {
-	content, err := os.ReadFile(path)
+func readRawFile(path string, maxBytes int64) (string, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
+
+	content, err := io.ReadAll(io.LimitReader(file, maxBytes))
+	if err != nil {
+		return "", err
+	}
+
 	return string(content), nil
 }
 
@@ -70,79 +102,11 @@ func readImageFile(_ string) (string, error) {
 	return "An image preview is available for this file. Use the visual contents to infer a better filename.", nil
 }
 
-func readDocumentContent(path string) (ExtractedContent, error) {
-	doc, err := fitz.New(path)
-	if err != nil {
-		return fallbackDocumentContent(path, fmt.Errorf("creating fitz document: %w", err))
+func CleanupPreviewTempDir() error {
+	if previewTempDir.dir == "" {
+		return nil
 	}
-	defer doc.Close()
-
-	text, textErr := extractDocumentText(doc, path)
-	previewPath, previewErr := renderFirstPagePreview(doc, path)
-
-	if textErr != nil && previewErr != nil {
-		return fallbackDocumentContent(path, fmt.Errorf("extracting document content failed: %v; preview failed: %v", textErr, previewErr))
-	}
-
-	if text == "" {
-		text = "Minimal document text was extracted. Prefer the first-page preview if available."
-	}
-
-	if previewErr == nil {
-		text += "\nA first-page preview image is available for this document."
-	}
-
-	return ExtractedContent{
-		Text:             text,
-		PreviewImagePath: previewPath,
-	}, nil
-}
-
-func extractDocumentText(doc *fitz.Document, path string) (string, error) {
-	pageCount := doc.NumPage()
-	if pageCount == 0 {
-		return "", nil
-	}
-
-	limit := min(pageCount, 2)
-	pages := make([]string, 0, limit)
-	for page := 0; page < limit; page++ {
-		text, err := doc.Text(page)
-		if err != nil {
-			return "", fmt.Errorf("extracting text from %s page %d: %w", path, page+1, err)
-		}
-		text = strings.TrimSpace(text)
-		if text == "" {
-			continue
-		}
-		pages = append(pages, text)
-	}
-
-	return strings.Join(pages, "\n\n"), nil
-}
-
-func renderFirstPagePreview(doc *fitz.Document, sourcePath string) (string, error) {
-	if doc.NumPage() == 0 {
-		return "", fmt.Errorf("document has no pages")
-	}
-
-	img, err := doc.Image(0)
-	if err != nil {
-		return "", fmt.Errorf("rendering first page image: %w", err)
-	}
-
-	tmpFile, err := os.CreateTemp("", "nomnom-preview-*.jpg")
-	if err != nil {
-		return "", fmt.Errorf("creating temp preview for %s: %w", sourcePath, err)
-	}
-	defer tmpFile.Close()
-
-	if err := jpeg.Encode(tmpFile, img, &jpeg.Options{Quality: jpeg.DefaultQuality}); err != nil {
-		_ = os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("encoding preview image for %s: %w", sourcePath, err)
-	}
-
-	return tmpFile.Name(), nil
+	return os.RemoveAll(previewTempDir.dir)
 }
 
 func fallbackDocumentContent(path string, cause error) (ExtractedContent, error) {

@@ -19,6 +19,7 @@ type args struct {
 	log         bool
 	revert      string
 	organize    bool
+	moveFiles   bool
 	prompt      string
 }
 
@@ -32,12 +33,18 @@ var rootCmd = &cobra.Command{
 nomnom analytics -d ~/Documents/files
 nomnom -d ~/Documents/files
 nomnom -d ~/Documents/files -n=false
+nomnom -d ~/Documents/files --move-files
 nomnom -d ~/Documents/files -p research
 nomnom -r .nomnom/logs/changes_123.json`,
 	Run: func(cmd *cobra.Command, _ []string) {
 		presenter := newCLIPresenter()
 		presenter.Banner()
 		presenter.Divider()
+
+		var moveFilesOverride *bool
+		if cmd.Flags().Changed("move-files") {
+			moveFilesOverride = &cmdArgs.moveFiles
+		}
 
 		// Check if revert flag is set
 		if cmdArgs.revert != "" {
@@ -63,6 +70,7 @@ nomnom -r .nomnom/logs/changes_123.json`,
 			ConfigPath:  cmdArgs.configPath,
 			Prompt:      cmdArgs.prompt,
 			AutoApprove: cmdArgs.autoApprove,
+			MoveFiles:   moveFilesOverride,
 			DryRun:      cmdArgs.dryRun,
 			Log:         cmdArgs.log,
 			Organize:    cmdArgs.organize,
