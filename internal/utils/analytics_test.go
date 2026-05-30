@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -113,5 +114,35 @@ func TestAnalyticsStoreSessionPathStaysUnderNomnomDirectory(t *testing.T) {
 	expectedPrefix := filepath.Join(baseDir, ".nomnom", "analytics", "sessions")
 	if filepath.Dir(sessions[0]) != expectedPrefix {
 		t.Fatalf("session dir = %q, want %q", filepath.Dir(sessions[0]), expectedPrefix)
+	}
+}
+
+func TestListAnalyticsSessionsIgnoresNonJSONAndSorts(t *testing.T) {
+	baseDir := t.TempDir()
+	sessionsDir := filepath.Join(baseDir, ".nomnom", "analytics", "sessions")
+	if err := os.MkdirAll(sessionsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	files := map[string]string{
+		"session_b.json": `{"session_id":"b","completed_at":"2026-04-16T12:00:00Z"}`,
+		"notes.txt":      "ignore me",
+		"session_a.json": `{"session_id":"a","completed_at":"2026-04-16T11:00:00Z"}`,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(sessionsDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", name, err)
+		}
+	}
+
+	paths, err := ListAnalyticsSessions(baseDir)
+	if err != nil {
+		t.Fatalf("ListAnalyticsSessions() error = %v", err)
+	}
+	if len(paths) != 2 {
+		t.Fatalf("ListAnalyticsSessions() len = %d, want 2", len(paths))
+	}
+	if filepath.Base(paths[0]) != "session_a.json" || filepath.Base(paths[1]) != "session_b.json" {
+		t.Fatalf("ListAnalyticsSessions() order = %v, want session_a.json then session_b.json", []string{filepath.Base(paths[0]), filepath.Base(paths[1])})
 	}
 }

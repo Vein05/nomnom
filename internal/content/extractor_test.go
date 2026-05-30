@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	utils "nomnom/internal/utils"
 )
@@ -115,5 +116,16 @@ func TestScanResultCleanupRemovesGeneratedPreviews(t *testing.T) {
 
 	if _, err := os.Stat(imagePath); err != nil {
 		t.Fatalf("Cleanup() should keep source image, stat err = %v", err)
+	}
+}
+
+func TestParseFileTimeoutParsesNumericSeconds(t *testing.T) {
+	timeout, err := parseFileTimeout("30", "30s")
+	if err != nil {
+		t.Fatalf("parseFileTimeout() error = %v", err)
+	}
+
+	if timeout != 30*time.Second {
+		t.Fatalf("parseFileTimeout() = %s, want %s", timeout, 30*time.Second)
 	}
 }

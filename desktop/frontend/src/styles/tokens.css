@@ -1,0 +1,147 @@
+:root {
+  --bg: 9 11 14;
+  --surface: 17 21 28;
+  --surface-2: 24 30 40;
+  --border: 40 49 64;
+  --text: 240 244 248;
+  --muted: 136 152 170;
+  --accent: 118 181 224;
+  --accent-foreground: 9 11 14;
+  --success: 75 174 139;
+  --warning: 201 152 76;
+  --danger: 230 95 95;
+  --sidebar: 13 16 21;
+  --sidebar-active: 28 34 45;
+
+  --surface-raised: rgb(var(--surface-2));
+  --text-primary: rgb(var(--text));
+  --text-secondary: rgb(var(--muted));
+  --accent-subtle: rgb(var(--accent) / 0.14);
+}
+
+:root[data-theme="nomnom-dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="nomnom-light"] {
+  color-scheme: light;
+  --bg: 242 245 249;
+  --surface: 255 255 255;
+  --surface-2: 235 240 246;
+  --border: 211 220 232;
+  --text: 16 20 26;
+  --muted: 89 104 120;
+  --accent: 38 82 131;
+  --accent-foreground: 255 255 255;
+  --success: 39 115 94;
+  --warning: 160 108 28;
+  --danger: 192 57 43;
+  --sidebar: 248 250 252;
+  --sidebar-active: 231 236 242;
+}
+
+:root[data-theme="catppuccin-mocha"] {
+  color-scheme: dark;
+  --bg: 30 30 46;
+  --surface: 49 50 68;
+  --surface-2: 69 71 90;
+  --border: 88 91 112;
+  --text: 205 214 244;
+  --muted: 166 173 200;
+  --accent: 137 180 250;
+  --accent-foreground: 30 30 46;
+  --success: 166 227 161;
+  --warning: 249 226 175;
+  --danger: 243 139 168;
+  --sidebar: 24 24 37;
+  --sidebar-active: 49 50 68;
+}
+
+:root[data-theme="catppuccin-latte"] {
+  color-scheme: light;
+  --bg: 239 241 245;
+  --surface: 255 255 255;
+  --surface-2: 230 233 239;
+  --border: 209 214 224;
+  --text: 76 79 105;
+  --muted: 108 111 133;
+  --accent: 30 102 245;
+  --accent-foreground: 255 255 255;
+  --success: 64 160 43;
+  --warning: 223 142 29;
+  --danger: 210 15 57;
+  --sidebar: 230 233 239;
+  --sidebar-active: 220 224 232;
+}
+
+/* Dracula */
+:root[data-theme="dracula"] {
+  color-scheme: dark;
+  --bg: 25 26 33;
+  --surface: 40 42 54;
+  --surface-2: 33 34 44;
+  --border: 98 114 164;
+  --text: 248 248 242;
+  --muted: 189 147 249;
+  --accent: 255 121 198;
+  --accent-foreground: 40 42 54;
+  --success: 80 250 123;
+  --warning: 241 250 140;
+  --danger: 255 85 85;
+  --sidebar: 25 26 33;
+  --sidebar-active: 40 42 54;
+}
+
+/* Nord */
+:root[data-theme="nord"] {
+  color-scheme: dark;
+  --bg: 46 52 64;
+  --surface: 59 66 82;
+  --surface-2: 67 76 94;
+  --border: 76 86 106;
+  --text: 236 239 244;
+  --muted: 129 161 193;
+  --accent: 136 192 208;
+  --accent-foreground: 46 52 64;
+  --success: 163 190 140;
+  --warning: 235 203 139;
+  --danger: 191 97 106;
+  --sidebar: 46 52 64;
+  --sidebar-active: 59 66 82;
+}
+
+/* Gruvbox */
+:root[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --bg: 29 32 33;
+  --surface: 40 40 40;
+  --surface-2: 60 56 54;
+  --border: 80 73 69;
+  --text: 235 219 178;
+  --muted: 146 131 116;
+  --accent: 131 165 152;
+  --accent-foreground: 40 40 40;
+  --success: 152 151 26;
+  --warning: 215 153 33;
+  --danger: 204 36 29;
+  --sidebar: 29 32 33;
+  --sidebar-active: 40 40 40;
+}
+
+/* Tokyo Night */
+:root[data-theme="tokyo-night"] {
+  color-scheme: dark;
+  --bg: 26 27 38;
+  --surface: 32 35 48;
+  --surface-2: 36 40 59;
+  --border: 58 66 94;
+  --text: 192 202 245;
+  --muted: 169 177 214;
+  --accent: 122 162 247;
+  --accent-foreground: 26 27 38;
+  --success: 115 218 202;
+  --warning: 255 158 100;
+  --danger: 247 118 142;
+  --sidebar: 26 27 38;
+  --sidebar-active: 32 35 48;
+}

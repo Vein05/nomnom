@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -16,19 +17,19 @@ const (
 	OperationRevert OperationType = "revert"
 )
 
-// LogEntry represents a single operation in the log
+// LogEntry represents a single operation in the log.
 type LogEntry struct {
 	Timestamp    time.Time     `json:"timestamp"`
 	Operation    OperationType `json:"operation"`
 	OriginalPath string        `json:"original_path"`
 	NewPath      string        `json:"new_path"`
-	BaseDir      string        `json:"base_dir"`      // Base directory of the operation
-	RelativePath string        `json:"relative_path"` // Path relative to base directory
+	BaseDir      string        `json:"base_dir"`      // Base directory of the operation.
+	RelativePath string        `json:"relative_path"` // Path relative to the base directory.
 	Success      bool          `json:"success"`
 	Error        string        `json:"error,omitempty"`
 }
 
-// ChangeLog represents a complete log of operations
+// ChangeLog represents a complete log of operations.
 type ChangeLog struct {
 	SessionID string     `json:"session_id"`
 	StartTime time.Time  `json:"start_time"`
@@ -36,7 +37,7 @@ type ChangeLog struct {
 	Entries   []LogEntry `json:"entries"`
 }
 
-// Logger handles logging operations
+// Logger handles logging operations.
 type Logger struct {
 	enabled   bool
 	baseDir   string
@@ -46,15 +47,14 @@ type Logger struct {
 	logFile   string
 }
 
-// NewLogger creates a new Logger instance
+// NewLogger creates a new Logger instance.
 func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 	if !enabled {
 		return &Logger{enabled: false}, nil
 	}
 
-	// Create logs directory if it doesn't exist
 	logDir := filepath.Join(baseDir, ".nomnom", "logs")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
@@ -69,7 +69,7 @@ func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 		logFile:   logFile,
 		changeLog: &ChangeLog{
 			SessionID: sessionID,
-			StartTime: time.Now(),
+			StartTime: time.Now().UTC(),
 			Entries:   make([]LogEntry, 0),
 		},
 	}
@@ -77,13 +77,12 @@ func NewLogger(enabled bool, baseDir string) (*Logger, error) {
 	return logger, nil
 }
 
-// LogOperationWithType logs a single operation with the specified operation type
+// LogOperationWithType logs a single operation with the specified operation type.
 func (l *Logger) LogOperationWithType(originalPath, newPath string, opType OperationType, success bool, err error) {
 	if !l.enabled {
 		return
 	}
 
-	// Get the base directory from the original path
 	baseDir := l.baseDir
 	if baseDir == "" {
 		baseDir = filepath.Dir(originalPath)
@@ -111,12 +110,12 @@ func (l *Logger) LogOperationWithType(originalPath, newPath string, opType Opera
 	l.changeLog.Entries = append(l.changeLog.Entries, entry)
 }
 
-// LogOperation logs a single operation (defaults to rename operation for backward compatibility)
+// LogOperation logs a single operation using the rename operation type.
 func (l *Logger) LogOperation(originalPath, newPath string, success bool, err error) {
 	l.LogOperationWithType(originalPath, newPath, OperationRename, success, err)
 }
 
-// Close finalizes the log and writes it to disk
+// Close finalizes the log and writes it to disk.
 func (l *Logger) Close() error {
 	if !l.enabled {
 		return nil
@@ -129,19 +128,19 @@ func (l *Logger) Close() error {
 		return fmt.Errorf("failed to marshal changelog: %w", err)
 	}
 
-	if err := os.WriteFile(l.logFile, data, 0644); err != nil {
+	if err := os.WriteFile(l.logFile, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write log file: %w", err)
 	}
 
 	return nil
 }
 
-// GetLogFile returns the path to the current log file
+// GetLogFile returns the path to the current log file.
 func (l *Logger) GetLogFile() string {
 	return l.logFile
 }
 
-// ListLogs returns a list of all log files
+// ListLogs returns a list of all log files.
 func ListLogs(baseDir string) ([]string, error) {
 	logDir := filepath.Join(baseDir, ".nomnom", "logs")
 	entries, err := os.ReadDir(logDir)
@@ -156,10 +155,12 @@ func ListLogs(baseDir string) ([]string, error) {
 		}
 	}
 
+	slices.Sort(logs)
+
 	return logs, nil
 }
 
-// LoadLog loads a specific log file
+// LoadLog loads a specific log file.
 func LoadLog(logPath string) (*ChangeLog, error) {
 	data, err := os.ReadFile(logPath)
 	if err != nil {

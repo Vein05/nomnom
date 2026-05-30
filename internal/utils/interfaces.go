@@ -18,6 +18,10 @@ type Approver interface {
 	Approve(action, oldName, newName string) (ApprovalDecision, error)
 }
 
+type ProgressReporter interface {
+	ReportProgress(done, total int, currentFile string)
+}
+
 type NopReporter struct{}
 
 func (NopReporter) Infof(string, ...any)  {}

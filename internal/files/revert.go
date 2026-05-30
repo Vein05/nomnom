@@ -2,6 +2,7 @@ package files
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -93,16 +94,9 @@ func ProcessRevert(opts RevertOptions) error {
 				continue
 			}
 
-			// Copy file to revert location
-			input, err := os.ReadFile(entry.NewPath)
-			if err != nil {
-				reporter.Errorf("Error reading file: %s, error: %v", entry.NewPath, err)
-				logger.LogOperationWithType(entry.NewPath, revertPath, utils.OperationRevert, false, err)
-				continue
-			}
-
-			if err := os.WriteFile(revertPath, input, 0644); err != nil {
-				reporter.Errorf("Error writing file: %s, error: %v", revertPath, err)
+			// Copy file to revert location using streaming I/O to avoid high memory usage.
+			if err := copyFileStream(entry.NewPath, revertPath); err != nil {
+				reporter.Errorf("Error copying file: %s -> %s, error: %v", entry.NewPath, revertPath, err)
 				logger.LogOperationWithType(entry.NewPath, revertPath, utils.OperationRevert, false, err)
 				continue
 			}
@@ -114,5 +108,25 @@ func ProcessRevert(opts RevertOptions) error {
 	}
 
 	reporter.Infof("Revert operation completed. Files have been placed in: %s", revertDir)
+	return nil
+}
+
+func copyFileStream(src, dst string) error {
+	input, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open source: %w", err)
+	}
+	defer input.Close()
+
+	output, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create destination: %w", err)
+	}
+	defer output.Close()
+
+	if _, err := io.Copy(output, input); err != nil {
+		return fmt.Errorf("copy contents: %w", err)
+	}
+
 	return nil
 }

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
-	fileutils "nomnom/internal/files"
 	utils "nomnom/internal/utils"
 )
 
@@ -22,14 +23,15 @@ const (
 )
 
 type ScannedFile struct {
-	SourcePath   string `json:"source_path,omitempty"`
-	RelativePath string `json:"relative_path,omitempty"`
-	OriginalName string `json:"original_name,omitempty"`
-	Extension    string `json:"extension,omitempty"`
-	Context      string `json:"context,omitempty"`
-	VisualPath   string `json:"visual_path,omitempty"`
-	Size         int64  `json:"size,omitempty"`
-	Category     string `json:"category,omitempty"`
+	SourcePath    string `json:"source_path,omitempty"`
+	RelativePath  string `json:"relative_path,omitempty"`
+	OriginalName  string `json:"original_name,omitempty"`
+	Extension     string `json:"extension,omitempty"`
+	Context       string `json:"context,omitempty"`
+	VisualPath    string `json:"visual_path,omitempty"`
+	VisualContent string `json:"visual_content,omitempty"`
+	Size          int64  `json:"size,omitempty"`
+	Category      string `json:"category,omitempty"`
 }
 
 type ScanResult struct {
@@ -83,11 +85,11 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 
 	workers := config.Performance.File.Workers
 	if workers == 0 {
-		workers = 1
+		workers = runtime.NumCPU()
 	}
-	timeout := config.Performance.File.Timeout
-	if timeout == "" {
-		timeout = "30s"
+	timeout, err := parseFileTimeout(config.Performance.File.Timeout, "30s")
+	if err != nil {
+		return ScanResult{}, fmt.Errorf("failed to parse file timeout: %w", err)
 	}
 	retries := config.Performance.File.Retries
 	if retries == 0 {
@@ -107,7 +109,7 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 	}
 
 	paths := make([]string, 0, len(entries))
-	if err := collectPaths(rootDir, entries, &paths); err != nil {
+	if err := collectPaths(rootDir, entries, &paths, config.FileHandling.SkipDotFiles); err != nil {
 		return ScanResult{}, err
 	}
 
@@ -126,24 +128,26 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 		err  error
 	}
 
-	sem := make(chan struct{}, workers)
-	results := make(chan fileResult, len(paths))
+	jobs := make(chan string)
+	results := make(chan fileResult, workers)
 	var wg sync.WaitGroup
 
-	for _, path := range paths {
-		path := path
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			file, err := scanFile(rootDir, path, maxSize)
-			results <- fileResult{file: file, err: err}
+			for path := range jobs {
+				file, err := scanFileWithRetry(rootDir, path, maxSize, retries, timeout)
+				results <- fileResult{file: file, err: err}
+			}
 		}()
 	}
 
 	go func() {
+		for _, path := range paths {
+			jobs <- path
+		}
+		close(jobs)
 		wg.Wait()
 		close(results)
 	}()
@@ -164,22 +168,25 @@ func ScanDirectory(dir string, config utils.Config, reporter utils.Reporter) (Sc
 	return result, nil
 }
 
-func collectPaths(root string, entries []os.DirEntry, paths *[]string) error {
+func collectPaths(root string, entries []os.DirEntry, paths *[]string, skipDotFiles bool) error {
 	for _, entry := range entries {
 		fullPath := filepath.Join(root, entry.Name())
 
 		if entry.IsDir() {
+			if skipDotFiles && strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
 			subEntries, err := os.ReadDir(fullPath)
 			if err != nil {
 				return fmt.Errorf("failed to read directory %s: %w", fullPath, err)
 			}
-			if err := collectPaths(fullPath, subEntries, paths); err != nil {
+			if err := collectPaths(fullPath, subEntries, paths, skipDotFiles); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if shouldSkip(entry.Name()) {
+		if shouldSkip(entry.Name(), skipDotFiles) {
 			continue
 		}
 
@@ -189,8 +196,8 @@ func collectPaths(root string, entries []os.DirEntry, paths *[]string) error {
 	return nil
 }
 
-func shouldSkip(name string) bool {
-	return strings.HasPrefix(name, ".") ||
+func shouldSkip(name string, skipDotFiles bool) bool {
+	return (skipDotFiles && strings.HasPrefix(name, ".")) ||
 		strings.HasSuffix(name, "~") ||
 		strings.HasSuffix(name, ".tmp") ||
 		strings.HasSuffix(name, ".swp")
@@ -218,32 +225,84 @@ func scanFile(rootDir, path string, maxSize int64) (ScannedFile, error) {
 		return ScannedFile{}, fmt.Errorf("file %s is too large to process", path)
 	}
 
-	extracted, err := fileutils.ExtractFileContent(path)
-	if err != nil {
-		return ScannedFile{}, fmt.Errorf("failed to read file %s: %w", path, err)
-	}
-
 	relativePath, err := filepath.Rel(rootDir, path)
 	if err != nil {
 		return ScannedFile{}, fmt.Errorf("failed to compute relative path for %s: %w", path, err)
 	}
 
 	name := filepath.Base(path)
+	ext := filepath.Ext(name)
 	return ScannedFile{
 		SourcePath:   path,
 		RelativePath: relativePath,
 		OriginalName: name,
-		Extension:    filepath.Ext(name),
-		Context: fmt.Sprintf("Content: %s\nFile: %s\nExtension Type: %s\nSize: %s",
-			extracted.Text,
+		Extension:    ext,
+		Context: fmt.Sprintf("File: %s\nExtension Type: %s\nSize: %s\nContent extraction is deferred until AI planning.",
 			name,
-			filepath.Ext(name),
+			ext,
 			formatFileSize(info.Size()),
 		),
-		VisualPath: extracted.PreviewImagePath,
-		Size:       info.Size(),
-		Category:   categoryForFile(name),
+		Size:     info.Size(),
+		Category: categoryForFile(name),
 	}, nil
+}
+
+func scanFileWithRetry(rootDir, path string, maxSize int64, retries int, timeout time.Duration) (ScannedFile, error) {
+	var lastErr error
+
+	for attempt := 0; attempt <= retries; attempt++ {
+		file, err := scanFileWithTimeout(rootDir, path, maxSize, timeout)
+		if err == nil {
+			return file, nil
+		}
+
+		lastErr = err
+	}
+
+	return ScannedFile{}, fmt.Errorf("failed to scan %s after %d attempt(s): %w", path, retries+1, lastErr)
+}
+
+func scanFileWithTimeout(rootDir, path string, maxSize int64, timeout time.Duration) (ScannedFile, error) {
+	if timeout <= 0 {
+		return scanFile(rootDir, path, maxSize)
+	}
+
+	type result struct {
+		file ScannedFile
+		err  error
+	}
+
+	resultCh := make(chan result, 1)
+	go func() {
+		file, err := scanFile(rootDir, path, maxSize)
+		resultCh <- result{file: file, err: err}
+	}()
+
+	select {
+	case res := <-resultCh:
+		return res.file, res.err
+	case <-time.After(timeout):
+		return ScannedFile{}, fmt.Errorf("scan timed out after %s", timeout)
+	}
+}
+
+func parseFileTimeout(raw, fallback string) (time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = fallback
+	}
+
+	timeout, err := time.ParseDuration(raw)
+	if err == nil {
+		return timeout, nil
+	}
+
+	seconds, convErr := strconv.Atoi(raw)
+	if convErr == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second, nil
+	}
+
+	return 0, err
 }
 
 func (r ScanResult) Cleanup() error {

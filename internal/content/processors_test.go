@@ -1,6 +1,9 @@
 package content
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +44,9 @@ func TestNewQuery(t *testing.T) {
 	}
 	if len(query.Scan.Files) != 1 {
 		t.Fatalf("NewQuery() scanned files = %d, want 1", len(query.Scan.Files))
+	}
+	if query.Context == nil {
+		t.Fatal("NewQuery() context = nil, want background context")
 	}
 }
 
@@ -165,7 +171,7 @@ func TestCopyFile(t *testing.T) {
 	if err := os.WriteFile(srcPath, []byte("test content"), 0644); err != nil {
 		t.Fatalf("failed to create source file: %v", err)
 	}
-	if err := copyFile(srcPath, dstPath); err != nil {
+	if err := copyFile(context.Background(), srcPath, dstPath); err != nil {
 		t.Fatalf("copyFile() error = %v", err)
 	}
 
@@ -175,6 +181,82 @@ func TestCopyFile(t *testing.T) {
 	}
 	if string(content) != "test content" {
 		t.Fatalf("copyFile() content mismatch = %q", string(content))
+	}
+}
+
+type cancelOnFirstProgressReporter struct {
+	cancel context.CancelFunc
+	count  int
+}
+
+func (r *cancelOnFirstProgressReporter) Infof(string, ...any)  {}
+func (r *cancelOnFirstProgressReporter) Warnf(string, ...any)  {}
+func (r *cancelOnFirstProgressReporter) Errorf(string, ...any) {}
+
+func (r *cancelOnFirstProgressReporter) ReportProgress(int, int, string) {
+	r.count++
+	if r.count == 1 && r.cancel != nil {
+		r.cancel()
+	}
+}
+
+func TestSafeProcessorProcessCancellation(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputDir := filepath.Join(tmpDir, "input")
+	outputDir := filepath.Join(tmpDir, "output")
+
+	if err := os.MkdirAll(inputDir, 0o755); err != nil {
+		t.Fatalf("failed to create input dir: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	reporter := &cancelOnFirstProgressReporter{cancel: cancel}
+	plan := make([]RenamePlanEntry, 0, 32)
+
+	for i := 0; i < 32; i++ {
+		sourcePath := filepath.Join(inputDir, fmt.Sprintf("file_%02d.txt", i))
+		if err := os.WriteFile(sourcePath, []byte("test content"), 0o644); err != nil {
+			t.Fatalf("failed to create source file %d: %v", i, err)
+		}
+		plan = append(plan, RenamePlanEntry{
+			File: ScannedFile{
+				SourcePath:   sourcePath,
+				RelativePath: filepath.Base(sourcePath),
+				OriginalName: filepath.Base(sourcePath),
+				Category:     "Documents",
+			},
+			SuggestedName: filepath.Base(sourcePath),
+		})
+	}
+
+	query := &Query{
+		Context:     ctx,
+		Dir:         inputDir,
+		DryRun:      false,
+		AutoApprove: true,
+		Reporter:    reporter,
+		Plan:        plan,
+	}
+
+	results, err := NewSafeProcessor(query, outputDir).Process()
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Process() error = %v, want context.Canceled", err)
+	}
+	if len(results) != len(plan) {
+		t.Fatalf("Process() results len = %d, want %d", len(results), len(plan))
+	}
+
+	successes := 0
+	for _, result := range results {
+		if result.Success {
+			successes++
+		}
+	}
+	if successes == len(plan) {
+		t.Fatalf("Process() successes = %d, want partial completion after cancellation", successes)
+	}
+	if reporter.count == 0 {
+		t.Fatal("ReportProgress() was not called before cancellation")
 	}
 }
 

@@ -4,9 +4,12 @@ on:
   release:
     types: [created]
 
+env:
+  NODE_OPTIONS: --max-old-space-size=4096
+
 jobs:
-  build:
-    name: Build Release Binaries
+  cli:
+    name: Build CLI Release Binaries
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -27,14 +30,18 @@ jobs:
             arch: arm64
             extension: ""
             cgo: "0"
+          - os: windows
+            arch: amd64
+            extension: ".exe"
+            cgo: "0"
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Build Binary
         env:
@@ -42,7 +49,7 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -v -ldflags "-X main.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
+          go build -v -ldflags "-X nomnom/cmd.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
           zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
 
       - name: Upload Release Asset
@@ -53,4 +60,68 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip
           asset_name: nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip
+          asset_content_type: application/zip
+
+  desktop:
+    name: Build Desktop Release (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            platform: darwin/universal
+            asset_name: nomnom-desktop-darwin-universal.zip
+          - name: Windows
+            os: windows-latest
+            platform: windows/amd64
+            asset_name: nomnom-desktop-windows-amd64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+
+      - name: Install Wails CLI
+        shell: bash
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        working-directory: desktop/frontend
+        run: npm ci
+
+      - name: Build Wails desktop app
+        working-directory: desktop
+        run: wails build -clean -platform ${{ matrix.platform }}
+
+      - name: Archive macOS desktop bundle
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent desktop/build/bin/desktop.app ${{ matrix.asset_name }}
+
+      - name: Archive Windows desktop binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path desktop/build/bin/desktop.exe -DestinationPath ${{ matrix.asset_name }}
+
+      - name: Upload Desktop Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
           asset_content_type: application/zip

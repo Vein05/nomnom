@@ -1,22 +1,29 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	ai "nomnom/internal/ai"
 	content "nomnom/internal/content"
+	files "nomnom/internal/files"
 	"nomnom/internal/utils"
 )
 
 type RunOptions struct {
+	Context     context.Context
 	Dir         string
 	ConfigPath  string
 	Prompt      string
 	OutputDir   string
 	AutoApprove bool
+	MoveFiles   *bool
 	DryRun      bool
 	Log         bool
 	Organize    bool
@@ -37,11 +44,11 @@ func NewService() Service {
 }
 
 func (Service) LoadConfig(configPath string) (utils.Config, error) {
-	return utils.LoadConfig(configPath, "")
+	return utils.LoadConfig(configPath)
 }
 
 func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver utils.Approver) (*PreparedRun, error) {
-	config, err := utils.LoadConfig(opts.ConfigPath, "")
+	config, err := utils.LoadConfig(opts.ConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -68,11 +75,18 @@ func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver uti
 	analytics := utils.NewAnalyticsStore(scan.RootDir, opts.DryRun)
 	analytics.RecordScan(len(scan.Files))
 
+	moveFiles := config.FileHandling.MoveFiles
+	if opts.MoveFiles != nil {
+		moveFiles = *opts.MoveFiles
+	}
+
 	query := content.NewQuery(content.QueryParams{
+		Context:     opts.Context,
 		Prompt:      resolvedPrompt,
 		Dir:         scan.RootDir,
 		ConfigPath:  opts.ConfigPath,
 		AutoApprove: opts.AutoApprove,
+		MoveFiles:   moveFiles,
 		DryRun:      opts.DryRun,
 		Log:         opts.Log,
 		Logger:      logger,
@@ -109,6 +123,9 @@ func (Service) GeneratePlan(run *PreparedRun) error {
 	}
 
 	run.Query.Plan = result.Plan
+	if err := persistRenamePlan(run.Query.Scan.RootDir, run.Query.Prompt, run.Query.Plan); err != nil && run.Query.Reporter != nil {
+		run.Query.Reporter.Warnf("Failed to persist rename plan cache: %v", err)
+	}
 	if run.Query.Analytics != nil {
 		run.Query.Analytics.RecordRenamePlan(len(result.Plan))
 	}
@@ -167,6 +184,7 @@ func (run *PreparedRun) Close() error {
 	var closeErr error
 	if run.Query != nil {
 		closeErr = errors.Join(closeErr, run.Query.Scan.Cleanup())
+		closeErr = errors.Join(closeErr, files.CleanupPreviewTempDir())
 		if run.Query.Logger != nil {
 			closeErr = errors.Join(closeErr, run.Query.Logger.Close())
 		}
@@ -176,4 +194,37 @@ func (run *PreparedRun) Close() error {
 	}
 
 	return closeErr
+}
+
+type cachedRenamePlan struct {
+	GeneratedAt time.Time                 `json:"generated_at"`
+	Prompt      string                    `json:"prompt"`
+	Entries     []content.RenamePlanEntry `json:"entries"`
+}
+
+func persistRenamePlan(rootDir, prompt string, plan []content.RenamePlanEntry) error {
+	cacheDir := filepath.Join(rootDir, ".nomnom", "cache")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return fmt.Errorf("create plan cache directory: %w", err)
+	}
+
+	payload := cachedRenamePlan{
+		GeneratedAt: time.Now().UTC(),
+		Prompt:      prompt,
+		Entries:     plan,
+	}
+
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal plan cache: %w", err)
+	}
+	data = append(data, '\n')
+
+	filename := fmt.Sprintf("rename_plan_%d.json", payload.GeneratedAt.Unix())
+	cachePath := filepath.Join(cacheDir, filename)
+	if err := os.WriteFile(cachePath, data, 0o644); err != nil {
+		return fmt.Errorf("write plan cache: %w", err)
+	}
+
+	return nil
 }

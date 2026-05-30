@@ -22,7 +22,7 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatalf("failed to write config fixture: %v", err)
 	}
 
-	config, err := LoadConfig(configPath, "")
+	config, err := LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
@@ -36,9 +36,22 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadConfigMissingFile(t *testing.T) {
-	_, err := LoadConfig(filepath.Join(t.TempDir(), "missing.json"), "")
+	_, err := LoadConfig(filepath.Join(t.TempDir(), "missing.json"))
 	if err == nil {
 		t.Fatal("LoadConfig() expected error for missing config file")
+	}
+}
+
+func TestLoadConfigInvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "broken.json")
+
+	if err := os.WriteFile(configPath, []byte(`{"output":`), 0o644); err != nil {
+		t.Fatalf("failed to write invalid config fixture: %v", err)
+	}
+
+	if _, err := LoadConfig(configPath); err == nil {
+		t.Fatal("LoadConfig() expected error for malformed JSON")
 	}
 }
 
@@ -71,7 +84,7 @@ func TestSaveConfig(t *testing.T) {
 		t.Fatalf("SaveConfig() path = %q, want %q", savedPath, configPath)
 	}
 
-	loaded, err := LoadConfig(configPath, "")
+	loaded, err := LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
