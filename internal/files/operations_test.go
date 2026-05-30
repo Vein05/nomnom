@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-func demoDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join("..", "..", "demo")
-}
-
 func TestExtractFileContentDocumentFallbackIsStructured(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "broken.pdf")
@@ -49,19 +44,26 @@ func TestExtractFileContentDocumentFallbackIsStructured(t *testing.T) {
 }
 
 func TestReadFileMissingFileReturnsError(t *testing.T) {
-	_, err := ReadFile(filepath.Join(demoDir(t), "nonexistent.txt"))
+	_, err := ReadFile(filepath.Join(t.TempDir(), "nonexistent.txt"))
 	if err == nil {
 		t.Fatal("ReadFile() error = nil, want error")
 	}
 }
 
 func TestListFiles(t *testing.T) {
-	files, err := filepath.Glob(filepath.Join(demoDir(t), "*"))
+	dir := t.TempDir()
+	for _, name := range []string{"a.txt", "b.png"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("test"), 0o644); err != nil {
+			t.Fatalf("WriteFile(%q) error = %v", name, err)
+		}
+	}
+
+	files, err := filepath.Glob(filepath.Join(dir, "*"))
 	if err != nil {
 		t.Fatalf("Glob() error = %v", err)
 	}
 
 	if len(files) == 0 {
-		t.Fatal("expected demo directory to contain files")
+		t.Fatal("expected directory to contain files")
 	}
 }

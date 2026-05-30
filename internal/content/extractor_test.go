@@ -10,8 +10,13 @@ import (
 )
 
 func TestProcessDirectory(t *testing.T) {
-	repoRoot := filepath.Clean(filepath.Join("..", ".."))
-	path := filepath.Join(repoRoot, "demo")
+	dir := t.TempDir()
+	for _, name := range []string{"a.txt", "b.png", "c.json"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("test"), 0o644); err != nil {
+			t.Fatalf("WriteFile(%q) error = %v", name, err)
+		}
+	}
+
 	config := utils.Config{
 		FileHandling: utils.FileHandlingConfig{
 			MaxSize: "100MB",
@@ -25,7 +30,7 @@ func TestProcessDirectory(t *testing.T) {
 		},
 	}
 
-	scan, err := ScanDirectory(path, config, utils.NopReporter{})
+	scan, err := ScanDirectory(dir, config, utils.NopReporter{})
 	if err != nil {
 		t.Fatalf("ScanDirectory failed: %v", err)
 	}
