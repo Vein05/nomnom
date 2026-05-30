@@ -1,0 +1,14 @@
+Meeting Notes: Design Review
+
+Attendees: Alice, Bob, Charlie, Diana
+Date: January 15, 2026
+
+Agenda:
+1. Review homepage redesign mockups
+2. Discuss accessibility audit findings
+3. Plan Q2 content calendar
+
+Action items:
+- Alice: finalize hero section by Friday
+- Bob: run contrast checks on all components
+- Charlie: draft blog post on new API features

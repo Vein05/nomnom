@@ -1,0 +1,13 @@
+{
+  "app": "NomNom",
+  "version": "1.0.0",
+  "settings": {
+    "theme": "dark",
+    "language": "en",
+    "shortcuts": {
+      "scan": "Ctrl+S",
+      "run": "Ctrl+R",
+      "cancel": "Escape"
+    }
+  }
+}

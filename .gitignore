@@ -49,6 +49,7 @@ desktop/e2e/playwright/.cache/
 .e2e-output/
 
 ui.md
-demo/
+demo/.nomnom/
+demo/nomnom/
 test-results/
 .claude/
