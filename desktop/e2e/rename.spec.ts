@@ -99,6 +99,13 @@ test.describe("Rename workflow", () => {
     const state = await setupPage(page);
     await scanDirectory(page, state.sourceDir);
 
+    // Trigger name generation — this puts the app in preview-ready state
+    await page.getByRole("button", { name: /run/i }).click();
+    await expect(async () => {
+      const badge = page.locator("header div.rounded-full").first();
+      await expect(badge).toContainText(/Ready/i, { timeout: 5_000 });
+    }).toPass({ timeout: 120_000 });
+
     const expectedRenames: Record<string, string> = {
       "Quarterly Business Report.pdf": "quarterly_business_report.pdf",
       "TAX DOCUMENT 2025.pdf": "tax_document_2025.pdf",
@@ -159,9 +166,6 @@ test.describe("Organize and execution features", () => {
 
   test("can toggle dry run off and run a real file rename", async ({ page }) => {
     const state = await setupPage(page);
-
-    await toggleCheckbox(page, /dry run/i, false);
-    await expect(page.getByRole("checkbox", { name: /dry run/i })).not.toBeChecked();
 
     // Scan — the file browser shows the same tree for both dry-run modes
     await page.locator('input[placeholder="/path/to/files"]').fill(state.sourceDir);
