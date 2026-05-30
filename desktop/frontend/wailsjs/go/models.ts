@@ -215,7 +215,7 @@ export namespace main {
 	export class FileHandlingConfig {
 	    max_size: string;
 	    auto_approve: boolean;
-	    move_files: boolean;
+	    hot_rename: boolean;
 	    skip_dot_files: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -226,7 +226,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.max_size = source["max_size"];
 	        this.auto_approve = source["auto_approve"];
-	        this.move_files = source["move_files"];
+	        this.hot_rename = source["hot_rename"];
 	        this.skip_dot_files = source["skip_dot_files"];
 	    }
 	}
@@ -299,6 +299,7 @@ export namespace main {
 	    current_file: string;
 	    message: string;
 	    summary: JobSummary;
+	    output_dir: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new JobStatus(source);
@@ -313,6 +314,7 @@ export namespace main {
 	        this.current_file = source["current_file"];
 	        this.message = source["message"];
 	        this.summary = this.convertValues(source["summary"], JobSummary);
+	        this.output_dir = source["output_dir"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -402,7 +404,7 @@ export namespace main {
 	    dry_run: boolean;
 	    log_session: boolean;
 	    auto_approve: boolean;
-	    move_files: boolean;
+	    hot_rename: boolean;
 	    organize: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -414,7 +416,7 @@ export namespace main {
 	        this.dry_run = source["dry_run"];
 	        this.log_session = source["log_session"];
 	        this.auto_approve = source["auto_approve"];
-	        this.move_files = source["move_files"];
+	        this.hot_rename = source["hot_rename"];
 	        this.organize = source["organize"];
 	    }
 	}

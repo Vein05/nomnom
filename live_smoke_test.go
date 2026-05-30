@@ -74,7 +74,7 @@ func TestLiveCLISmoke(t *testing.T) {
 		"file_handling": map[string]any{
 			"max_size":     "10MB",
 			"auto_approve": true,
-			"move_files":   false,
+			"hot_rename":   false,
 		},
 		"content_extraction": map[string]any{
 			"extract_text":       true,

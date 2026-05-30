@@ -33,13 +33,14 @@ export interface JobStatus {
   current_file: string;
   message: string;
   summary: JobSummary;
+  output_dir: string;
 }
 
 export interface RunJobOptions {
   dry_run: boolean;
   log_session: boolean;
   auto_approve: boolean;
-  move_files: boolean;
+  hot_rename: boolean;
   organize: boolean;
 }
 
@@ -80,7 +81,7 @@ export interface DesktopConfig {
   file_handling: {
     max_size: string;
     auto_approve: boolean;
-    move_files: boolean;
+    hot_rename: boolean;
     skip_dot_files: boolean;
   };
   content_extraction: {

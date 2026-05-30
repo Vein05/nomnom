@@ -29,7 +29,7 @@ type QueryParams struct {
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
-	MoveFiles   bool
+	HotRename   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -46,7 +46,7 @@ type Query struct {
 	Dir         string
 	ConfigPath  string
 	AutoApprove bool
-	MoveFiles   bool
+	HotRename   bool
 	DryRun      bool
 	Log         bool
 	Logger      *utils.Logger
@@ -124,7 +124,7 @@ func NewQuery(params QueryParams) *Query {
 		Dir:         dir,
 		ConfigPath:  params.ConfigPath,
 		AutoApprove: params.AutoApprove,
-		MoveFiles:   params.MoveFiles,
+		HotRename:   params.HotRename,
 		DryRun:      params.DryRun,
 		Log:         params.Log,
 		Logger:      params.Logger,
@@ -273,6 +273,8 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string
 				var approveErr error
 				decision, approveErr = p.promptForRenameApproval(entry.File.OriginalName, filepath.Base(targetPath))
 				if approveErr != nil {
+					result.Success = false
+					result.Error = approveErr
 					return result, approveErr
 				}
 			}
@@ -341,6 +343,10 @@ func (p *SafeProcessor) collectApprovals() (map[string]utils.ApprovalDecision, e
 }
 
 func (p *SafeProcessor) destinationPath(entry RenamePlanEntry) string {
+	if p.query.HotRename {
+		return filepath.Join(filepath.Dir(entry.File.SourcePath), entry.SuggestedName)
+	}
+
 	relativeDir := filepath.Dir(entry.File.RelativePath)
 	if relativeDir == "." {
 		relativeDir = ""
@@ -380,7 +386,7 @@ func (p *SafeProcessor) ensureDir(dir string) error {
 }
 
 func (p *SafeProcessor) writeFile(src, dst string) error {
-	if p.query.MoveFiles {
+	if p.query.HotRename {
 		return moveOrCopyFile(p.context(), src, dst)
 	}
 

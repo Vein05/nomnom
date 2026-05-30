@@ -1,5 +1,4 @@
 import {
-  ChevronRight,
   File,
   FileArchive,
   FileAudio,
@@ -7,11 +6,10 @@ import {
   FileText,
   FileVideo,
   Folder,
-  FolderOpen,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
 import { Badge } from "../ui/Badge";
+import { SlotName } from "../ui/SlotName";
 import { wails } from "../../lib/wails";
 import type { RenameEntry } from "../../lib/types";
 
@@ -138,9 +136,11 @@ interface FileBrowserProps {
   entries: RenameEntry[];
   rootDir: string;
   scanning: boolean;
+  generating?: boolean;
+  processing?: boolean;
 }
 
-export function FileBrowser({ entries, rootDir, scanning }: FileBrowserProps) {
+export function FileBrowser({ entries, rootDir, scanning, generating, processing }: FileBrowserProps) {
   const browserEntries = buildBrowserEntries(entries, rootDir);
 
   if (scanning) {
@@ -186,15 +186,26 @@ export function FileBrowser({ entries, rootDir, scanning }: FileBrowserProps) {
             key={entry.name}
             type="button"
             onClick={() => handleClick(entry)}
-            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-raised"
+            className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-raised ${
+              processing && entry.renameEntry?.status === "Pending"
+                ? "animate-pulse"
+                : ""
+            }`}
           >
             <Icon className={`h-5 w-5 shrink-0 ${colorCls}`} />
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium text-text-primary">
-                  {entry.renameEntry?.new_name || entry.name}
-                </span>
+                {generating && entry.renameEntry ? (
+                  <SlotName
+                    name={entry.renameEntry.new_name || entry.name}
+                    spinning
+                  />
+                ) : (
+                  <span className="truncate text-sm font-medium text-text-primary">
+                    {entry.renameEntry?.new_name || entry.name}
+                  </span>
+                )}
                 {entry.renameEntry && entryStatusBadge(entry.renameEntry)}
               </div>
               {entry.renameEntry ? (

@@ -416,18 +416,18 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
                 description="Skip confirmation when the plan is safe to execute."
               />
               <Toggle
-                label="Move Files Instead of Copy"
-                checked={draft.file_handling.move_files}
+                label="Hot Rename"
+                checked={draft.file_handling.hot_rename}
                 onChange={(event) =>
                   updateDraft((current) => ({
                     ...current,
                     file_handling: {
                       ...current.file_handling,
-                      move_files: event.target.checked,
+                      hot_rename: event.target.checked,
                     },
                   }))
                 }
-                description="Relocate files when the filesystem supports it."
+                description="Rename files in-place where they sit."
               />
               <Toggle
                 label="Skip Dot Files"

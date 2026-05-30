@@ -333,7 +333,8 @@ func (a *App) ScanDirectory(path string) (string, error) {
 		Done:    0,
 		Total:   len(entries),
 		Message: fmt.Sprintf("%d files found", len(entries)),
-		Summary: JobSummary{Planned: len(entries)},
+		Summary:   JobSummary{Planned: len(entries)},
+			OutputDir: outputDir,
 	}
 
 	a.mu.Lock()
@@ -389,7 +390,9 @@ func (a *App) GenerateNames(jobID string) error {
 	}
 
 	if err := service.GeneratePlan(run); err != nil {
-		_ = run.Close()
+		if closeErr := run.Close(); closeErr != nil {
+			a.logErrorf("close after generate plan failure: %v", closeErr)
+		}
 		return fmt.Errorf("generate names: %w", err)
 	}
 
@@ -437,6 +440,12 @@ func (a *App) RunJob(jobID string, opts RunJobOptions) (string, error) {
 
 	if needsGenerate {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					a.logErrorf("job %s panicked during generation: %v", jobID, r)
+					a.finishJobFailure(jobID, fmt.Errorf("internal panic: %v", r), nil, DesktopConfig{}, opts, "")
+				}
+			}()
 			if err := a.GenerateNames(jobID); err != nil {
 				a.finishJobFailure(jobID, err, nil, DesktopConfig{}, opts, "")
 				return
@@ -612,7 +621,7 @@ func (a *App) executeJob(jobID string, opts RunJobOptions, runCtx context.Contex
 
 	reporter := jobReporter{app: a, jobID: jobID}
 	service := appsvc.NewService()
-	moveFiles := opts.MoveFiles
+	hotRename := opts.HotRename
 	defer cancel()
 	defer a.clearJobCancel(jobID)
 
@@ -621,7 +630,7 @@ func (a *App) executeJob(jobID string, opts RunJobOptions, runCtx context.Contex
 		Dir:         dir,
 		ConfigPath:  configPath,
 		AutoApprove: opts.AutoApprove,
-		MoveFiles:   &moveFiles,
+		HotRename:   &hotRename,
 		DryRun:      opts.DryRun,
 		Log:         opts.LogSession,
 		Organize:    opts.Organize,

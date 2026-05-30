@@ -19,7 +19,7 @@ type args struct {
 	log         bool
 	revert      string
 	organize    bool
-	moveFiles   bool
+	hotRename   bool
 	prompt      string
 }
 
@@ -33,7 +33,7 @@ var rootCmd = &cobra.Command{
 nomnom analytics -d ~/Documents/files
 nomnom -d ~/Documents/files
 nomnom -d ~/Documents/files -n=false
-nomnom -d ~/Documents/files --move-files
+nomnom -d ~/Documents/files --hot-rename
 nomnom -d ~/Documents/files -p research
 nomnom -r .nomnom/logs/changes_123.json`,
 	Run: func(cmd *cobra.Command, _ []string) {
@@ -41,9 +41,9 @@ nomnom -r .nomnom/logs/changes_123.json`,
 		presenter.Banner()
 		presenter.Divider()
 
-		var moveFilesOverride *bool
-		if cmd.Flags().Changed("move-files") {
-			moveFilesOverride = &cmdArgs.moveFiles
+		var hotRenameOverride *bool
+		if cmd.Flags().Changed("hot-rename") {
+			hotRenameOverride = &cmdArgs.hotRename
 		}
 
 		// Check if revert flag is set
@@ -70,7 +70,7 @@ nomnom -r .nomnom/logs/changes_123.json`,
 			ConfigPath:  cmdArgs.configPath,
 			Prompt:      cmdArgs.prompt,
 			AutoApprove: cmdArgs.autoApprove,
-			MoveFiles:   moveFilesOverride,
+			HotRename:   hotRenameOverride,
 			DryRun:      cmdArgs.dryRun,
 			Log:         cmdArgs.log,
 			Organize:    cmdArgs.organize,
@@ -112,8 +112,6 @@ nomnom -r .nomnom/logs/changes_123.json`,
 			color.Red("Error processing files: %v\n", err)
 			os.Exit(1)
 		}
-		presenter.Divider()
-		presenter.Titlef("Processing files with AI to generate new names")
 		presenter.Divider()
 
 		successCount := presenter.PrintResults(results, cmdArgs.dryRun)

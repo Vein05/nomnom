@@ -38,6 +38,7 @@ const scanStatus: JobStatus = {
     skipped: 0,
     errors: 0,
   },
+  output_dir: "",
 };
 
 const runningStatus: JobStatus = {
@@ -52,7 +53,7 @@ const runOptions: RunJobOptions = {
   dry_run: false,
   log_session: true,
   auto_approve: false,
-  move_files: false,
+  hot_rename: false,
   organize: false,
 };
 

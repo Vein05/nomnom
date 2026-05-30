@@ -16,7 +16,7 @@
   "file_handling": {
     "max_size": "100MB",
     "auto_approve": false,
-    "move_files": false
+    "hot_rename": false
   },
   "content_extraction": {
     "extract_text": true,

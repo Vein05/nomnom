@@ -173,7 +173,7 @@ func collectPaths(root string, entries []os.DirEntry, paths *[]string, skipDotFi
 		fullPath := filepath.Join(root, entry.Name())
 
 		if entry.IsDir() {
-			if skipDotFiles && strings.HasPrefix(entry.Name(), ".") {
+			if entry.Name() == ".nomnom" || entry.Name() == "nomnom" || (skipDotFiles && strings.HasPrefix(entry.Name(), ".")) {
 				continue
 			}
 			subEntries, err := os.ReadDir(fullPath)

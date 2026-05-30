@@ -189,11 +189,11 @@ func runAdvancedSetup(config *utils.Config) error {
 	}
 	config.FileHandling.AutoApprove = autoApprove
 
-	moveFiles, err := promptBool("Move files instead of copy mode?", config.FileHandling.MoveFiles)
+	hotRename, err := promptBool("Rename files in-place?", config.FileHandling.HotRename)
 	if err != nil {
 		return err
 	}
-	config.FileHandling.MoveFiles = moveFiles
+	config.FileHandling.HotRename = hotRename
 
 	skipDotFiles, err := promptBool("Skip dot files and dot directories?", config.FileHandling.SkipDotFiles)
 	if err != nil {
@@ -239,7 +239,7 @@ func mergeConfig(base, override utils.Config) utils.Config {
 		base.FileHandling.MaxSize = override.FileHandling.MaxSize
 	}
 	base.FileHandling.AutoApprove = override.FileHandling.AutoApprove
-	base.FileHandling.MoveFiles = override.FileHandling.MoveFiles
+	base.FileHandling.HotRename = override.FileHandling.HotRename
 	if override.ContentExtraction != (utils.ContentExtractionConfig{}) {
 		base.ContentExtraction = override.ContentExtraction
 	}

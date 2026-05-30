@@ -1,8 +1,9 @@
 import { BarChart2, Clock, FolderOpen, Settings } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Shell } from "./components/layout/Shell";
 import { Button } from "./components/ui/Button";
 import { Modal } from "./components/ui/Modal";
+import { OnboardingWizard, hasCompletedOnboarding } from "./components/ui/OnboardingWizard";
 import { SplashScreen } from "./components/ui/SplashScreen";
 import { ToastProvider } from "./components/ui/ToastProvider";
 import { ViewTransition } from "./components/ui/ViewTransition";
@@ -27,7 +28,14 @@ function App() {
     const [dirtySettings, setDirtySettings] = useState(false);
     const [pendingRoute, setPendingRoute] = useState<ViewRoute | null>(null);
     const [splashDone, setSplashDone] = useState(false);
+    const [onboardingDone, setOnboardingDone] = useState(() => hasCompletedOnboarding());
     const [stepIndex, setStepIndex] = useState(0);
+
+    useEffect(() => {
+      if (splashDone && !onboardingDone) {
+        setOnboardingDone(hasCompletedOnboarding());
+      }
+    }, [splashDone, onboardingDone]);
 
     const handleRouteChange = useCallback(
         (nextRoute: ViewRoute) => {
@@ -55,6 +63,9 @@ function App() {
     return (
         <ToastProvider>
             {!splashDone ? <SplashScreen onDone={() => setSplashDone(true)} /> : null}
+            {splashDone && !onboardingDone ? (
+              <OnboardingWizard onDone={() => setOnboardingDone(true)} />
+            ) : null}
             <Shell
                 navItems={navItems}
                 route={route}

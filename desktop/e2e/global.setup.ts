@@ -61,7 +61,7 @@ function writeTestConfig(configPath: string) {
     file_handling: {
       max_size: "100MB",
       auto_approve: true,
-      move_files: false,
+      hot_rename: false,
       skip_dot_files: true,
     },
     content_extraction: {

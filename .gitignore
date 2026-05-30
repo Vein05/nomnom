@@ -30,7 +30,6 @@ notes.md
 
 internal/files/demo
 internal/content/demo
-demo/
 .nomnom/logs/
 
 # ignore all video files
@@ -50,3 +49,5 @@ desktop/e2e/playwright/.cache/
 .e2e-output/
 
 ui.md
+demo/
+test-results/

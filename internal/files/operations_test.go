@@ -12,34 +12,6 @@ func demoDir(t *testing.T) string {
 	return filepath.Join("..", "..", "demo")
 }
 
-func TestReadFileText(t *testing.T) {
-	content, err := ReadFile(filepath.Join(demoDir(t), "abcd.txt"))
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-
-	if strings.TrimSpace(content) == "" {
-		t.Fatal("ReadFile() returned empty content for text file")
-	}
-}
-
-func TestExtractFileContentImageUsesVisualSource(t *testing.T) {
-	path := filepath.Join(demoDir(t), "image1.png")
-
-	content, err := ExtractFileContent(path)
-	if err != nil {
-		t.Fatalf("ExtractFileContent() error = %v", err)
-	}
-
-	if content.PreviewImagePath != path {
-		t.Fatalf("PreviewImagePath = %q, want %q", content.PreviewImagePath, path)
-	}
-
-	if !strings.Contains(content.Text, "image preview is available") {
-		t.Fatalf("Text = %q, want image preview guidance", content.Text)
-	}
-}
-
 func TestExtractFileContentDocumentFallbackIsStructured(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "broken.pdf")

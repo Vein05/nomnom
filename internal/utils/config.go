@@ -41,7 +41,7 @@ type AIConfig struct {
 type FileHandlingConfig struct {
 	MaxSize      string `json:"max_size"`       // Maximum file size allowed
 	AutoApprove  bool   `json:"auto_approve"`   // Whether to automatically approve files
-	MoveFiles    bool   `json:"move_files"`     // Move files instead of copying when applying the plan
+	HotRename    bool   `json:"hot_rename"`     // Rename files in-place instead of copying to output directory
 	SkipDotFiles bool   `json:"skip_dot_files"` // Whether dotfiles and dot-directories should be skipped during scans
 }
 
@@ -99,7 +99,7 @@ func DefaultConfig() Config {
 		FileHandling: FileHandlingConfig{
 			MaxSize:      "100MB",
 			AutoApprove:  false,
-			MoveFiles:    false,
+			HotRename:    false,
 			SkipDotFiles: true,
 		},
 		ContentExtraction: ContentExtractionConfig{

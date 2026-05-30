@@ -4,7 +4,7 @@ type RunJobOptions struct {
 	DryRun      bool `json:"dry_run"`
 	LogSession  bool `json:"log_session"`
 	AutoApprove bool `json:"auto_approve"`
-	MoveFiles   bool `json:"move_files"`
+	HotRename   bool `json:"hot_rename"`
 	Organize    bool `json:"organize"`
 }
 
@@ -33,6 +33,7 @@ type JobStatus struct {
 	CurrentFile string     `json:"current_file"`
 	Message     string     `json:"message"`
 	Summary     JobSummary `json:"summary"`
+	OutputDir   string     `json:"output_dir"`
 }
 
 type Session struct {
@@ -98,7 +99,7 @@ type AIConfig struct {
 type FileHandlingConfig struct {
 	MaxSize      string `json:"max_size"`
 	AutoApprove  bool   `json:"auto_approve"`
-	MoveFiles    bool   `json:"move_files"`
+	HotRename    bool   `json:"hot_rename"`
 	SkipDotFiles bool   `json:"skip_dot_files"`
 }
 

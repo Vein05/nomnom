@@ -23,7 +23,7 @@ type RunOptions struct {
 	Prompt      string
 	OutputDir   string
 	AutoApprove bool
-	MoveFiles   *bool
+	HotRename   *bool
 	DryRun      bool
 	Log         bool
 	Organize    bool
@@ -75,9 +75,9 @@ func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver uti
 	analytics := utils.NewAnalyticsStore(scan.RootDir, opts.DryRun)
 	analytics.RecordScan(len(scan.Files))
 
-	moveFiles := config.FileHandling.MoveFiles
-	if opts.MoveFiles != nil {
-		moveFiles = *opts.MoveFiles
+	hotRename := config.FileHandling.HotRename
+	if opts.HotRename != nil {
+		hotRename = *opts.HotRename
 	}
 
 	query := content.NewQuery(content.QueryParams{
@@ -86,7 +86,7 @@ func (Service) PrepareRun(opts RunOptions, reporter utils.Reporter, approver uti
 		Dir:         scan.RootDir,
 		ConfigPath:  opts.ConfigPath,
 		AutoApprove: opts.AutoApprove,
-		MoveFiles:   moveFiles,
+		HotRename:   hotRename,
 		DryRun:      opts.DryRun,
 		Log:         opts.Log,
 		Logger:      logger,

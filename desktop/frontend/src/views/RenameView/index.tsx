@@ -80,7 +80,7 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
   const { notify } = useToast();
   const [sourceDir, setSourceDir] = useState("");
   const [logSession, setLogSession] = useState(true);
-  const [moveFiles, setMoveFiles] = useState(false);
+  const [hotRename, setHotRename] = useState(false);
   const [organize, setOrganize] = useState(true);
   const [scanBusy, setScanBusy] = useState(false);
   const [runBusy, setRunBusy] = useState(false);
@@ -92,17 +92,26 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
   const isRunning = status?.state === "running";
   const progress = status && status.total > 0 ? Math.min(100, Math.round((status.done / status.total) * 100)) : 0;
   const stepIndex = status?.state === "complete" ? 3 : comparisonPreview || scanPreview ? 2 : hasSourceDir ? 1 : 0;
-  const outputPreview = config?.output?.trim() ? config.output : currentSourceDir ? `${currentSourceDir}/nomnom/renamed` : "source/nomnom/renamed";
+  const outputPreview = config?.output?.trim() ? config.output : hotRename ? currentSourceDir || "source" : currentSourceDir ? `${currentSourceDir}/nomnom/renamed` : "source/nomnom/renamed";
+  const resolvedOutput = status?.output_dir || outputPreview;
 
   useEffect(() => {
     if (config) {
-      setMoveFiles(config.file_handling.move_files);
+      setHotRename(config.file_handling.hot_rename);
     }
   }, [config]);
 
   useEffect(() => {
     onStepChange(stepIndex);
   }, [stepIndex, onStepChange]);
+
+  useEffect(() => {
+    if (status?.state === "failed") {
+      notify(status.message || "Job failed unexpectedly", "error");
+    }
+    // Only fire when status transitions to failed, not on every status change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.state]);
 
   async function handleScan() {
     if (!currentSourceDir) {
@@ -145,7 +154,7 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
         dry_run: false,
         log_session: logSession,
         auto_approve: true,
-        move_files: moveFiles,
+        hot_rename: hotRename,
         organize,
       });
     } catch (err) {
@@ -224,7 +233,14 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
             {showFileBrowser && (
               <div className="text-right">
                 <div className="text-xs text-text-secondary">
-                  Output: <span className="mono text-text-primary">{outputPreview}</span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                    onClick={() => wails.openFile(resolvedOutput).catch(() => {})}
+                  >
+                    <FolderOpen className="h-3 w-3" />
+                    Open Folder
+                  </button>
                 </div>
                 <div className="mt-1 text-[11px] text-text-secondary">
                   {config?.ai.provider} / {config?.ai.model}
@@ -238,6 +254,8 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
               entries={fileBrowserEntries}
               rootDir={fileBrowserRoot}
               scanning={scanBusy}
+              generating={status?.state === "generating"}
+              processing={status?.state === "running"}
             />
           </div>
 
@@ -281,7 +299,7 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
             <div className="flex h-full flex-col gap-3">
               <div className="space-y-1 rounded-xl border border-border bg-surface-raised/25 p-3">
                 <Toggle label="Log Session" checked={logSession} onChange={(event) => setLogSession(event.target.checked)} description="Save a session log for history and revert." />
-                <Toggle label="Move Files" checked={moveFiles} onChange={(event) => setMoveFiles(event.target.checked)} description="Move files instead of copying them." />
+                <Toggle label="Hot Rename" checked={hotRename} onChange={(event) => setHotRename(event.target.checked)} description="Rename files in-place where they sit." />
                 <Toggle label="Organize" checked={organize} onChange={(event) => setOrganize(event.target.checked)} description="Group output into category folders." />
               </div>
               <div className="rounded-xl border border-border bg-surface-raised/40 px-3 py-2 text-xs text-text-secondary">
@@ -328,8 +346,48 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
                 {status.summary.renamed} renamed · {status.summary.skipped} skipped · {status.summary.errors} errors
               </div>
             </div>
-            <div className="text-xs text-text-secondary">
-              Output: <span className="mono text-text-primary">{outputPreview}</span>
+            <button
+              type="button"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/30 bg-accent-subtle px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+              onClick={() => wails.openFile(resolvedOutput).catch(() => {})}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              Open Folder
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Failure notice */}
+      {status && status.state === "failed" ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.12)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-red-600 dark:text-red-400">Rename failed</div>
+              <div className="mt-1 max-w-prose text-xs text-text-secondary">
+                {status.message || "Unknown error"}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 text-xs text-accent hover:text-accent/80"
+              onClick={() => handleRun()}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Canceled notice */}
+      {status && status.state === "canceled" ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.12)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-amber-600 dark:text-amber-400">Rename canceled</div>
+              <div className="mt-1 text-xs text-text-secondary">
+                {status.summary.renamed} renamed · {status.summary.skipped} skipped · {status.summary.errors} errors
+              </div>
             </div>
           </div>
         </div>

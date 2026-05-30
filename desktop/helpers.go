@@ -52,7 +52,7 @@ func desktopConfigFromCore(config utils.Config) DesktopConfig {
 		FileHandling: FileHandlingConfig{
 			MaxSize:      config.FileHandling.MaxSize,
 			AutoApprove:  config.FileHandling.AutoApprove,
-			MoveFiles:    config.FileHandling.MoveFiles,
+			HotRename:    config.FileHandling.HotRename,
 			SkipDotFiles: config.FileHandling.SkipDotFiles,
 		},
 		ContentExtraction: ContentExtractionConfig{
@@ -101,7 +101,7 @@ func coreConfigFromDesktop(config DesktopConfig) utils.Config {
 	core.AI.Prompt = strings.TrimSpace(config.AI.Prompt)
 	core.FileHandling.MaxSize = config.FileHandling.MaxSize
 	core.FileHandling.AutoApprove = config.FileHandling.AutoApprove
-	core.FileHandling.MoveFiles = config.FileHandling.MoveFiles
+	core.FileHandling.HotRename = config.FileHandling.HotRename
 	core.FileHandling.SkipDotFiles = config.FileHandling.SkipDotFiles
 	core.ContentExtraction.ExtractText = config.ContentExtraction.ExtractText
 	core.ContentExtraction.ExtractMetadata = config.ContentExtraction.ExtractMetadata
@@ -319,6 +319,7 @@ func planSummary(planned int, results []content.ProcessResult) JobSummary {
 		}
 		summary.Errors++
 	}
+	summary.Skipped = maxInt(planned-summary.Renamed-summary.Errors, 0)
 	return summary
 }
 
