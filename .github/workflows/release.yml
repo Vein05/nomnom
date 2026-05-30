@@ -3,6 +3,7 @@ name: Build and Release Binaries
 on:
   release:
     types: [created]
+  workflow_dispatch:
 
 env:
   NODE_OPTIONS: --max-old-space-size=4096
@@ -72,7 +73,7 @@ jobs:
           - name: macOS
             os: macos-latest
             platform: darwin/universal
-            asset_name: nomnom-desktop-darwin-universal.zip
+            asset_name: nomnom-desktop-darwin-universal.dmg
           - name: Windows
             os: windows-latest
             platform: windows/amd64
@@ -107,9 +108,13 @@ jobs:
         working-directory: desktop
         run: wails build -clean -platform ${{ matrix.platform }}
 
-      - name: Archive macOS desktop bundle
+      - name: Create macOS DMG
         if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent desktop/build/bin/desktop.app ${{ matrix.asset_name }}
+        run: |
+          hdiutil create -volname "nomnom" \
+            -srcfolder desktop/build/bin/nomnom-desktop.app \
+            -ov -format UDZO \
+            ${{ matrix.asset_name }}
 
       - name: Archive Windows desktop binary
         if: runner.os == 'Windows'
@@ -124,4 +129,4 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ matrix.asset_name }}
           asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/zip
+          asset_content_type: ${{ runner.os == 'macOS' && 'application/x-apple-diskimage' || 'application/zip' }}
