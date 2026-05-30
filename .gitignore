@@ -51,3 +51,4 @@ desktop/e2e/playwright/.cache/
 ui.md
 demo/
 test-results/
+.claude/
