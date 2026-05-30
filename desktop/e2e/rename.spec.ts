@@ -99,12 +99,10 @@ test.describe("Rename workflow", () => {
     const state = await setupPage(page);
     await scanDirectory(page, state.sourceDir);
 
-    // Trigger name generation — this puts the app in preview-ready state
+    // Trigger name generation and wait for job to complete.
+    // The plan is populated with AI-renamed names during the run.
     await page.getByRole("button", { name: /run/i }).click();
-    await expect(async () => {
-      const badge = page.locator("header div.rounded-full").first();
-      await expect(badge).toContainText(/Ready/i, { timeout: 5_000 });
-    }).toPass({ timeout: 120_000 });
+    await waitForJobComplete(page);
 
     const expectedRenames: Record<string, string> = {
       "Quarterly Business Report.pdf": "quarterly_business_report.pdf",
