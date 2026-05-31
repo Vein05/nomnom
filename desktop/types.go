@@ -45,14 +45,20 @@ type Session struct {
 	Status    string `json:"status"`
 }
 
+type AnalyticsSessionPoint struct {
+	Date    string `json:"date"`
+	Renamed int    `json:"renamed"`
+}
+
 type AnalyticsSummary struct {
-	Sessions     int     `json:"sessions"`
-	Renamed      int     `json:"renamed"`
-	Tokens       int     `json:"tokens"`
-	AvgPerRun    float64 `json:"avg_per_run"`
-	RecentRuns   int     `json:"recent_runs"`
-	UniqueModels int     `json:"unique_models"`
-	HistoryError string  `json:"history_error,omitempty"`
+	Sessions       int                      `json:"sessions"`
+	Renamed        int                      `json:"renamed"`
+	Tokens         int                      `json:"tokens"`
+	AvgPerRun      float64                  `json:"avg_per_run"`
+	RecentRuns     int                      `json:"recent_runs"`
+	UniqueModels   int                      `json:"unique_models"`
+	RecentSessions []AnalyticsSessionPoint  `json:"recent_sessions"`
+	HistoryError   string                   `json:"history_error,omitempty"`
 }
 
 type OllamaStatus struct {

@@ -446,6 +446,18 @@ func analyticsSummary(records []desktopHistoryRecord) AnalyticsSummary {
 	}
 	summary.UniqueModels = len(models)
 
+	recent := records
+	if len(recent) > 7 {
+		recent = recent[len(recent)-7:]
+	}
+	summary.RecentSessions = make([]AnalyticsSessionPoint, len(recent))
+	for i, r := range recent {
+		summary.RecentSessions[i] = AnalyticsSessionPoint{
+			Date:    r.Date.Format("Jan 2"),
+			Renamed: r.Renamed,
+		}
+	}
+
 	return summary
 }
 

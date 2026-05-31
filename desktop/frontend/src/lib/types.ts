@@ -53,6 +53,11 @@ export interface Session {
   status: string;
 }
 
+export interface AnalyticsSessionPoint {
+  date: string;
+  renamed: number;
+}
+
 export interface AnalyticsSummary {
   sessions: number;
   renamed: number;
@@ -60,6 +65,7 @@ export interface AnalyticsSummary {
   avg_per_run: number;
   recent_runs: number;
   unique_models: number;
+  recent_sessions: AnalyticsSessionPoint[];
   history_error?: string;
 }
 

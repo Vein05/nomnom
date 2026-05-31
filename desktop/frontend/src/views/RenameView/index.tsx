@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { FileBrowser } from "../../components/file/FileBrowser";
 import { Input } from "../../components/ui/Input";
+import { Modal } from "../../components/ui/Modal";
 import { Toggle } from "../../components/ui/Toggle";
 import { useToast } from "../../components/ui/ToastProvider";
 import { useConfig } from "../../hooks/useConfig";
@@ -84,6 +85,7 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
   const [organize, setOrganize] = useState(true);
   const [scanBusy, setScanBusy] = useState(false);
   const [runBusy, setRunBusy] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const hasSourceDir = sourceDir.trim().length > 0;
   const currentSourceDir = sourceDir.trim();
   const hasCurrentScan = hasSourceDir && scannedDirectory === currentSourceDir;
@@ -146,6 +148,10 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
   async function handleRun() {
     if (!hasCurrentScan || plan.length === 0) {
       notify("Scan the open folder before running.", "error");
+      return;
+    }
+    if (config && !config.file_handling.auto_approve) {
+      setShowConfirmModal(true);
       return;
     }
     setRunBusy(true);
@@ -236,7 +242,7 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-                    onClick={() => wails.openFile(resolvedOutput).catch(() => {})}
+                    onClick={() => wails.openFile(fileBrowserRoot).catch(() => {})}
                   >
                     <FolderOpen className="h-3 w-3" />
                     Open Folder
@@ -392,6 +398,42 @@ export function RenameView({ onOpenSettings, onStepChange }: RenameViewProps) {
           </div>
         </div>
       ) : null}
+
+      {/* Confirmation dialog for non-auto-approve mode */}
+      <Modal
+        open={showConfirmModal}
+        title="Confirm Rename"
+        onClose={() => setShowConfirmModal(false)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowConfirmModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              onClick={() => {
+                setShowConfirmModal(false);
+                setRunBusy(true);
+                run({
+                  dry_run: false,
+                  log_session: logSession,
+                  auto_approve: true,
+                  hot_rename: hotRename,
+                  organize,
+                }).catch((err) => {
+                  notify(err instanceof Error ? err.message : "Run failed", "error");
+                }).finally(() => {
+                  setRunBusy(false);
+                });
+              }}
+            >
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <p>Rename {plan.length} {plan.length === 1 ? "file" : "files"}?</p>
+      </Modal>
     </section>
   );
 }

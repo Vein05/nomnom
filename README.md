@@ -42,6 +42,8 @@ Download the latest build for your platform from the [Releases](https://github.c
 | Windows (x64) | `desktop-amd64.exe` or `nomnom-windows-amd64.zip` |
 | Linux (x64) | `nomnom-linux-amd64.zip` |
 
+> **Note:** Windows builds are included in releases but have not been tested — I don't have a Windows machine. Contributors with Windows access are very welcome to test, report issues, or submit fixes.
+
 ### Build from source
 
 ```bash

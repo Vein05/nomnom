@@ -1,20 +1,4 @@
 import { useEffect, useState } from "react";
-import {
-  Bot,
-  Boxes,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  Eye,
-  EyeOff,
-  FileCog,
-  FilePlus2,
-  FolderOpen,
-  Gauge,
-  KeyRound,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
@@ -255,7 +239,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
 
       <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
         <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          <FolderOpen className="h-4 w-4" />
           Config Source
         </div>
         <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
@@ -265,12 +248,10 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
             onChange={(event) => setPathDraft(event.target.value)}
             placeholder="/path/to/nomnom-config.json"
           />
-          <Button variant="outline" onClick={handleBrowseConfig} disabled={configBusy} className="inline-flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
+          <Button variant="outline" onClick={handleBrowseConfig} disabled={configBusy}>
             Open
           </Button>
-          <Button variant="ghost" onClick={handleCreateConfig} disabled={configBusy} className="inline-flex items-center gap-2">
-            <FilePlus2 className="h-4 w-4" />
+          <Button variant="ghost" onClick={handleCreateConfig} disabled={configBusy}>
             New
           </Button>
           <Button variant="solid" onClick={() => void handleApplyConfigPath()} disabled={configBusy}>
@@ -325,7 +306,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
             onClick={() => setThemesExpanded((v) => !v)}
             className="mt-2 inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
           >
-            {themesExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             {themesExpanded ? "Show Less" : `View ${themeOptions.length - visibleThemes} More Themes`}
           </button>
         ) : null}
@@ -359,7 +339,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              <FileCog className="h-4 w-4" />
               App Output + Case
             </div>
             <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
@@ -382,7 +361,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
 
           <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              <Boxes className="h-4 w-4" />
               File Handling
             </div>
             <div className="space-y-2.5">
@@ -448,7 +426,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
 
           <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              <Gauge className="h-4 w-4" />
               Performance
             </div>
             <div className="space-y-2.5">
@@ -565,7 +542,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
         <div className="space-y-3">
           <div className="mt-auto rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              <Bot className="h-4 w-4" />
               AI Config
             </div>
             <div className="space-y-2.5">
@@ -625,7 +601,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
               </div>
               <div>
                 <div className="mb-1 inline-flex items-center gap-1 text-xs text-text-secondary">
-                  <KeyRound className="h-3.5 w-3.5" />
                   API Key
                 </div>
                 <div className="flex items-center gap-2">
@@ -650,7 +625,7 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
                       aria-label={showApiKey ? "Hide API key" : "Show API key"}
                     >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showApiKey ? "Hide" : "Show"}
                     </button>
                   </div>
                   <Button
@@ -668,7 +643,7 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
                             : ""
                     }`}
                   >
-                    {testingApiKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Test"}
+                    {testingApiKey ? "Testing..." : "Test"}
                   </Button>
                 </div>
                 {draft.ai.provider === "openrouter" ? (
@@ -698,7 +673,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
                         onClick={() => setShowApiKeyResponse((current) => !current)}
                         className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-text-secondary transition-colors hover:bg-surface-2"
                       >
-                        {showApiKeyResponse ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         {showApiKeyResponse ? "Hide" : "Response"}
                       </button>
                     </div>
@@ -809,7 +783,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
 
           <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              <Sparkles className="h-4 w-4" />
               Content Extraction
             </div>
             <div className="space-y-2.5">
@@ -891,7 +864,6 @@ export function SettingsView({ theme, onThemeChange, onDirtyChange }: SettingsVi
 
         <div className="rounded-xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)] xl:col-span-2">
           <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
-            <SlidersHorizontal className="h-4 w-4" />
             Logging
           </div>
           <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">

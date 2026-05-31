@@ -37,12 +37,6 @@ type jobState struct {
 	cancelRequested bool
 }
 
-type desktopApprover struct{}
-
-func (desktopApprover) Approve(string, string, string) (utils.ApprovalDecision, error) {
-	return utils.ApprovalYes, nil
-}
-
 type jobReporter struct {
 	app   *App
 	jobID string
@@ -384,7 +378,7 @@ func (a *App) GenerateNames(jobID string) error {
 		DryRun:      true,
 		Log:         false,
 		Organize:    true,
-	}, utils.NopReporter{}, desktopApprover{})
+	}, utils.NopReporter{}, nil)
 	if err != nil {
 		return fmt.Errorf("prepare run: %w", err)
 	}
@@ -634,7 +628,7 @@ func (a *App) executeJob(jobID string, opts RunJobOptions, runCtx context.Contex
 		DryRun:      opts.DryRun,
 		Log:         opts.LogSession,
 		Organize:    opts.Organize,
-	}, reporter, desktopApprover{})
+	}, reporter, nil)
 	if err != nil {
 		a.finishJobFailure(jobID, fmt.Errorf("prepare run: %w", err), nil, DesktopConfig{}, opts, "")
 		return

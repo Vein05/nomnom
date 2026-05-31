@@ -10,6 +10,7 @@ const blankAnalytics: AnalyticsSummary = {
   avg_per_run: 0,
   recent_runs: 0,
   unique_models: 0,
+  recent_sessions: [],
 };
 
 export function AnalyticsView() {
@@ -33,8 +34,11 @@ export function AnalyticsView() {
     { label: "Sessions", value: stats.sessions },
     { label: "Renamed", value: stats.renamed },
     { label: "Tokens", value: stats.tokens },
-    { label: "Avg / run", value: stats.avg_per_run },
+    { label: "Avg / run", value: stats.avg_per_run.toFixed(1) },
   ];
+
+  const sessions = stats.recent_sessions ?? [];
+  const maxRenamed = sessions.reduce((max, s) => Math.max(max, s.renamed), 1);
 
   const hasSessions = stats.sessions > 0;
 
@@ -63,14 +67,31 @@ export function AnalyticsView() {
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.12)]">
               <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">Activity</div>
-              <div className="mt-3 flex items-end gap-2">
-                <div className="h-16 flex-1 rounded-xl border border-border bg-surface-raised/40" />
-                <div className="h-12 flex-1 rounded-xl border border-border bg-surface-raised/40" />
-                <div className="h-20 flex-1 rounded-xl border border-border bg-accent-subtle" />
-                <div className="h-10 flex-1 rounded-xl border border-border bg-surface-raised/40" />
-                <div className="h-24 flex-1 rounded-xl border border-border bg-accent-subtle" />
-              </div>
-              <div className="mt-3 text-xs text-text-secondary">Recent runs: {stats.recent_runs}</div>
+              {sessions.length > 0 ? (
+                <>
+                  <div className="mt-3 flex items-end gap-2">
+                    {sessions.map((s) => {
+                      const pct = (s.renamed / maxRenamed) * 100;
+                      return (
+                        <div key={s.date} className="flex flex-1 flex-col items-center gap-1">
+                          <span className="text-[10px] text-text-secondary">{s.renamed}</span>
+                          <div className="w-full rounded-md bg-accent-subtle" style={{ height: `${Math.max(8, pct * 0.64)}px`, minHeight: "8px" }} />
+                          <span className="text-[10px] text-text-secondary">{s.date}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 text-xs text-text-secondary">Recent runs: {stats.recent_runs}</div>
+                </>
+              ) : (
+                <div className="mt-3 flex items-end gap-2">
+                  <div className="h-16 flex-1 rounded-xl border border-border bg-surface-raised/40" />
+                  <div className="h-12 flex-1 rounded-xl border border-border bg-surface-raised/40" />
+                  <div className="h-20 flex-1 rounded-xl border border-border bg-accent-subtle" />
+                  <div className="h-10 flex-1 rounded-xl border border-border bg-surface-raised/40" />
+                  <div className="h-24 flex-1 rounded-xl border border-border bg-accent-subtle" />
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.12)]">
@@ -82,7 +103,7 @@ export function AnalyticsView() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Renamed per run</span>
-                  <span className="text-text-primary">{stats.avg_per_run}</span>
+                  <span className="text-text-primary">{stats.avg_per_run.toFixed(1)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Total tokens</span>
