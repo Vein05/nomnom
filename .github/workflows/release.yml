@@ -19,7 +19,7 @@ jobs:
           - os: darwin
             arch: amd64
             extension: ""
-            runs_on: macos-latest
+            runs_on: macos-13
           - os: darwin
             arch: arm64
             extension: ""
@@ -45,7 +45,29 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Build Binary
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libffi
+
+      - name: Build mupdf 1.24.9 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          git clone --depth 1 --branch 1.24.9 https://github.com/ArtifexSoftware/mupdf.git /tmp/mupdf
+          cd /tmp/mupdf
+          make libs HAVE_X11=no HAVE_GLUT=no -j$(sysctl -n hw.logicalcpu)
+
+      - name: Build Binary (macOS with CGO)
+        if: runner.os == 'macOS'
+        env:
+          CGO_ENABLED: 1
+          CGO_CFLAGS: -I/tmp/mupdf/include
+          CGO_LDFLAGS: -L/tmp/mupdf/build/release -L/opt/homebrew/opt/libffi/lib -L/usr/local/opt/libffi/lib -lmupdf -lmupdf-third -lffi
+        run: |
+          go build -v -ldflags "-X nomnom/cmd.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
+          zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
+
+      - name: Build Binary (Linux/Windows)
+        if: runner.os != 'macOS'
         env:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.os }}
