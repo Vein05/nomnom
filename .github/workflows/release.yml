@@ -10,31 +10,32 @@ env:
 
 jobs:
   cli:
-    name: Build CLI Release Binaries
-    runs-on: ubuntu-latest
+    name: Build CLI (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runs_on }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: linux
-            arch: amd64
-            extension: ""
-            cgo: "0"
-          - os: linux
-            arch: arm64
-            extension: ""
-            cgo: "0"
           - os: darwin
             arch: amd64
             extension: ""
-            cgo: "0"
+            runs_on: macos-latest
           - os: darwin
             arch: arm64
             extension: ""
-            cgo: "0"
+            runs_on: macos-latest
+          - os: linux
+            arch: amd64
+            extension: ""
+            runs_on: ubuntu-latest
+          - os: linux
+            arch: arm64
+            extension: ""
+            runs_on: ubuntu-latest
           - os: windows
             arch: amd64
             extension: ".exe"
-            cgo: "0"
+            runs_on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +47,7 @@ jobs:
 
       - name: Build Binary
         env:
-          CGO_ENABLED: ${{ matrix.cgo }}
+          CGO_ENABLED: 0
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
