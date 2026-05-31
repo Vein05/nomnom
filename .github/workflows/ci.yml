@@ -30,8 +30,7 @@ jobs:
 
       - name: Run gofmt (root)
         run: |
-          files=$(find . -path ./desktop -prune -o -name '*.go' -print)
-          out=$(gofmt -l $files)
+          out=$(find . -path ./desktop -prune -o -name '*.go' -exec gofmt -l {} +)
           if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
 
       - name: Run go vet (root)
@@ -47,8 +46,7 @@ jobs:
 
       - name: Run gofmt (desktop)
         run: |
-          files=$(find desktop -path desktop/frontend/wailsjs -prune -o -name '*.go' -print)
-          out=$(gofmt -l $files)
+          out=$(find desktop -path desktop/frontend/wailsjs -prune -o -name '*.go' -exec gofmt -l {} +)
           if [ -n "$out" ]; then echo "gofmt required:"; echo "$out"; exit 1; fi
 
       - name: Run go vet (desktop)
