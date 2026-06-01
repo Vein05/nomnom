@@ -249,7 +249,6 @@ func slugify(input string) string {
 	return value
 }
 
-
 func mapScannedFiles(files []content.ScannedFile) []RenameEntry {
 	entries := make([]RenameEntry, 0, len(files))
 	for index, file := range files {

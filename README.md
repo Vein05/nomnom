@@ -24,7 +24,7 @@
 
 ## What It Does
 
-NomNom is a desktop app that renames your files using AI. Point it at a folder, and it generates clean, consistent names based on file contents — text, images, audio metadata, and more. It's built with [Wails](https://wails.io) and shares a Go backend with the included CLI.
+NomNom is a desktop app that renames your files using AI. Point it at a folder, and it generates clean, consistent names based on file contents - text, images, audio metadata, and more. It's built with [Wails](https://wails.io) and shares a Go backend with the included CLI.
 
 - **Scan** a directory to preview all files
 - **AI naming** generates rename suggestions using your provider of choice
@@ -34,7 +34,16 @@ NomNom is a desktop app that renames your files using AI. Point it at a folder, 
 
 ## Install
 
-Download the latest build for your platform from the [Releases](https://github.com/vein05/nomnom/releases) tab.
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap vein05/tap
+brew install nomnom
+```
+
+### Download
+
+Grab the latest build for your platform from the [Releases](https://github.com/vein05/nomnom/releases) tab.
 
 | Platform | Asset |
 |----------|-------|
@@ -42,7 +51,7 @@ Download the latest build for your platform from the [Releases](https://github.c
 | Windows (x64) | `desktop-amd64.exe` or `nomnom-windows-amd64.zip` |
 | Linux (x64) | `nomnom-linux-amd64.zip` |
 
-> **Note:** Windows builds are included in releases but have not been tested — I don't have a Windows machine. Contributors with Windows access are very welcome to test, report issues, or submit fixes.
+> **Note:** Windows builds are included in releases but have not been tested - I don't have a Windows machine. Contributors with Windows access are very welcome to test, report issues, or submit fixes.
 
 ### Build from source
 
@@ -63,9 +72,9 @@ NomNom supports three providers, configured through the Settings panel or intera
 
 | Provider | Setup |
 |----------|-------|
-| **OpenRouter** | API key (`OPENROUTER_API_KEY`) — access to Google Gemini, Qwen, Mistral, and more |
+| **OpenRouter** | API key (`OPENROUTER_API_KEY`) - access to Google Gemini, Qwen, Mistral, and more |
 | **DeepSeek** | API key (`DEEPSEEK_API_KEY`) |
-| **Ollama** | Local instance — no key required |
+| **Ollama** | Local instance - no key required |
 
 Built-in model suggestions are provided for OpenRouter and DeepSeek. You can also type any model ID your provider supports.
 
@@ -120,8 +129,8 @@ make desktop
 
 ## Repository Layout
 
-- `cmd/`, `internal/` — shared Go backend: scanning, AI calls, file operations, logging, analytics
-- `desktop/` — Wails desktop app with React frontend and its own Go module
-- `data/` — sample fixtures and reference material
+- `cmd/`, `internal/` - shared Go backend: scanning, AI calls, file operations, logging, analytics
+- `desktop/` - Wails desktop app with React frontend and its own Go module
+- `data/` - sample fixtures and reference material
 
 The desktop app uses the same Go service layer as the CLI. File scanning, AI planning, rename execution, logging, and analytics all run through shared backend code.
