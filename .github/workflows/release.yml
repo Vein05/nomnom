@@ -63,7 +63,7 @@ jobs:
           CGO_CFLAGS: -I/tmp/mupdf/include
           CGO_LDFLAGS: -L/tmp/mupdf/build/release -L/opt/homebrew/opt/libffi/lib -L/usr/local/opt/libffi/lib -lmupdf -lmupdf-third -lffi
         run: |
-          go build -v -ldflags "-X nomnom/cmd.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
+          go build -v -tags "extlib static" -ldflags "-X nomnom/cmd.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
           zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
 
       - name: Build Binary (Linux/Windows)

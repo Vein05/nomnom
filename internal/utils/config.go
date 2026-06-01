@@ -216,6 +216,9 @@ func SaveConfig(path string, config Config) (string, error) {
 	if err := tempFile.Close(); err != nil {
 		return "", fmt.Errorf("failed to close temporary config file: %w", err)
 	}
+	if err := os.Chmod(tempPath, 0o600); err != nil {
+		return "", fmt.Errorf("failed to set config file permissions: %w", err)
+	}
 	if err := os.Rename(tempPath, resolvedPath); err != nil {
 		return "", fmt.Errorf("failed to save config: %w", err)
 	}

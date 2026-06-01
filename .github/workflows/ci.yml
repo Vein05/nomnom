@@ -64,6 +64,24 @@ jobs:
         working-directory: desktop/frontend
         run: npm test
 
+  validate-windows:
+    name: Validate (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run Go tests
+        run: go test ./...
+
   e2e:
     name: E2E Tests (macOS)
     runs-on: macos-latest

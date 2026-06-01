@@ -249,19 +249,6 @@ func slugify(input string) string {
 	return value
 }
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 func mapScannedFiles(files []content.ScannedFile) []RenameEntry {
 	entries := make([]RenameEntry, 0, len(files))
@@ -319,7 +306,7 @@ func planSummary(planned int, results []content.ProcessResult) JobSummary {
 		}
 		summary.Errors++
 	}
-	summary.Skipped = maxInt(planned-summary.Renamed-summary.Errors, 0)
+	summary.Skipped = max(planned-summary.Renamed-summary.Errors, 0)
 	return summary
 }
 
@@ -429,7 +416,7 @@ func historySession(record desktopHistoryRecord) Session {
 func analyticsSummary(records []desktopHistoryRecord) AnalyticsSummary {
 	summary := AnalyticsSummary{
 		Sessions:   len(records),
-		RecentRuns: minInt(5, len(records)),
+		RecentRuns: min(5, len(records)),
 	}
 
 	models := make(map[string]struct{})

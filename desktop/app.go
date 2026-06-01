@@ -588,16 +588,49 @@ func (a *App) GetAnalytics() (AnalyticsSummary, error) {
 }
 
 // OpenFile opens the file at the given path with the OS default handler.
+// Only paths within a directory previously used by a job are allowed.
 func (a *App) OpenFile(path string) error {
 	path = filepath.Clean(path)
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+
+	a.mu.RLock()
+	allowed := false
+	for _, job := range a.jobs {
+		if job.dir != "" && isSubpath(job.dir, absPath) {
+			allowed = true
+			break
+		}
+		if job.outputDir != "" && isSubpath(job.outputDir, absPath) {
+			allowed = true
+			break
+		}
+	}
+	a.mu.RUnlock()
+
+	if !allowed {
+		return fmt.Errorf("path is not within an active job directory")
+	}
+
 	switch goruntime.GOOS {
 	case "darwin":
-		return exec.Command("open", path).Start()
+		return exec.Command("open", absPath).Start()
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", path).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", absPath).Start()
 	default:
-		return exec.Command("xdg-open", path).Start()
+		return exec.Command("xdg-open", absPath).Start()
 	}
+}
+
+func isSubpath(base, target string) bool {
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return false
+	}
+	return !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."
 }
 
 func (a *App) executeJob(jobID string, opts RunJobOptions, runCtx context.Context, cancel context.CancelFunc) {
@@ -784,7 +817,7 @@ func (a *App) finishJobCanceled(jobID string, results []content.ProcessResult, c
 	}
 
 	summary := planSummary(len(results), results)
-	summary.Skipped = maxInt(summary.Planned-summary.Renamed-summary.Errors, 0)
+	summary.Skipped = max(summary.Planned-summary.Renamed-summary.Errors, 0)
 	record := desktopHistoryRecord{
 		Date:      time.Now().UTC(),
 		Directory: "",
