@@ -24,7 +24,7 @@ NomNom is a desktop app that renames your files using AI. Point it at a folder, 
 - **AI naming** generates rename suggestions using your provider of choice
 - **Preview** every suggestion before applying
 - **Apply** renames in-place or copy to an output directory
-- **Revert** any session from local history
+- **Revert** any session from local history (CLI only, desktop coming soon)
 
 ## Install
 
