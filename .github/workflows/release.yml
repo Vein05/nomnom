@@ -52,9 +52,9 @@ jobs:
       - name: Build mupdf 1.24.9 (macOS)
         if: runner.os == 'macOS'
         run: |
-          git clone --depth 1 --branch 1.24.9 https://github.com/ArtifexSoftware/mupdf.git /tmp/mupdf
+          git clone --depth 1 --branch 1.24.9 --recursive https://github.com/ArtifexSoftware/mupdf.git /tmp/mupdf
           cd /tmp/mupdf
-          make libs HAVE_X11=no HAVE_GLUT=no -j$(sysctl -n hw.logicalcpu)
+          make libs HAVE_X11=no HAVE_GLUT=no HAVE_LEPTONICA=no HAVE_TESSERACT=no -j$(sysctl -n hw.logicalcpu)
 
       - name: Build Binary (macOS with CGO)
         if: runner.os == 'macOS'

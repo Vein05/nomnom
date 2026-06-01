@@ -34,24 +34,35 @@ NomNom is a desktop app that renames your files using AI. Point it at a folder, 
 
 ## Install
 
-### Homebrew (macOS/Linux)
+### Desktop App
+
+Download the `.dmg` (macOS) or `.zip` (Windows) from [Releases](https://github.com/vein05/nomnom/releases).
+
+| Platform | Asset |
+|----------|-------|
+| macOS (Universal) | `nomnom-desktop-darwin-universal.dmg` |
+| Windows (x64) | `nomnom-desktop-windows-amd64.zip` |
+
+> **Note:** Windows builds are included in releases but have not been tested - I don't have a Windows machine. Contributors with Windows access are very welcome to test, report issues, or submit fixes.
+
+### CLI
+
+Install via Homebrew (macOS/Linux):
 
 ```bash
 brew tap vein05/tap
 brew install nomnom
 ```
 
-### Download
-
-Grab the latest build for your platform from the [Releases](https://github.com/vein05/nomnom/releases) tab.
+Or download the CLI binary directly from [Releases](https://github.com/vein05/nomnom/releases):
 
 | Platform | Asset |
 |----------|-------|
-| macOS (Apple Silicon) | `nomnom-desktop.app` or `nomnom-darwin-arm64.zip` |
-| Windows (x64) | `desktop-amd64.exe` or `nomnom-windows-amd64.zip` |
+| macOS (Apple Silicon) | `nomnom-darwin-arm64.zip` |
+| macOS (Intel) | `nomnom-darwin-amd64.zip` |
 | Linux (x64) | `nomnom-linux-amd64.zip` |
-
-> **Note:** Windows builds are included in releases but have not been tested - I don't have a Windows machine. Contributors with Windows access are very welcome to test, report issues, or submit fixes.
+| Linux (ARM) | `nomnom-linux-arm64.zip` |
+| Windows (x64) | `nomnom-windows-amd64.zip` |
 
 ### Build from source
 
