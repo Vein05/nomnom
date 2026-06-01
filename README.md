@@ -12,15 +12,9 @@
   </a>
 </p>
 
-<p align="center">
-  <img src="banner.png" alt="NomNom banner" width="720" />
-</p>
-
 ## Demo
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/Vein05/nomnom-data/refs/heads/main/output.gif" alt="NomNom demo">
-</div>
+https://github.com/user-attachments/assets/b4b3aa81-53f8-48cf-ba5b-1506e21b0c57
 
 ## What It Does
 
