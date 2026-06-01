@@ -54,14 +54,14 @@ jobs:
         run: |
           git clone --depth 1 --branch 1.24.9 --recursive https://github.com/ArtifexSoftware/mupdf.git /tmp/mupdf
           cd /tmp/mupdf
-          make libs HAVE_X11=no HAVE_GLUT=no HAVE_LEPTONICA=no HAVE_TESSERACT=no -j$(sysctl -n hw.logicalcpu)
+          make libs HAVE_X11=no HAVE_GLUT=no HAVE_LEPTONICA=no HAVE_TESSERACT=no USE_SYSTEM_ZLIB=yes -j$(sysctl -n hw.logicalcpu)
 
       - name: Build Binary (macOS with CGO)
         if: runner.os == 'macOS'
         env:
           CGO_ENABLED: 1
           CGO_CFLAGS: -I/tmp/mupdf/include
-          CGO_LDFLAGS: -L/tmp/mupdf/build/release -L/opt/homebrew/opt/libffi/lib -L/usr/local/opt/libffi/lib -lmupdf -lmupdf-third -lffi
+          CGO_LDFLAGS: -L/tmp/mupdf/build/release -L/opt/homebrew/opt/libffi/lib -L/usr/local/opt/libffi/lib -lmupdf -lmupdf-third -lffi -lz
         run: |
           go build -v -tags "extlib static" -ldflags "-X nomnom/cmd.Version=${{ github.ref_name }}" -o "nomnom${{ matrix.extension }}"
           zip "nomnom-${{ matrix.os }}-${{ matrix.arch }}.zip" "nomnom${{ matrix.extension }}" LICENSE README.md config.example.json
