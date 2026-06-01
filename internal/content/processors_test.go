@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	prompts "nomnom/data/prompts"
 	utils "nomnom/internal/utils"
 )
 
@@ -275,14 +276,8 @@ func TestSafeProcessorProcessCancellation(t *testing.T) {
 }
 
 func TestResolvePrompt(t *testing.T) {
-	imagePrompt, err := os.ReadFile(NomNomPrompts[1].TestPath)
-	if err != nil {
-		t.Fatalf("failed to read image prompt: %v", err)
-	}
-	researchPrompt, err := os.ReadFile(NomNomPrompts[0].TestPath)
-	if err != nil {
-		t.Fatalf("failed to read research prompt: %v", err)
-	}
+	imagePrompt := prompts.ImagesPrompt
+	researchPrompt := prompts.ResearchPrompt
 
 	tests := []struct {
 		name     string
@@ -291,8 +286,8 @@ func TestResolvePrompt(t *testing.T) {
 		expected string
 	}{
 		{name: "Default prompt", prompt: "", config: utils.Config{}, expected: defaultPrompt},
-		{name: "Images prompt", prompt: "images", config: utils.Config{}, expected: string(imagePrompt)},
-		{name: "Research prompt", prompt: "research", config: utils.Config{}, expected: string(researchPrompt)},
+		{name: "Images prompt", prompt: "images", config: utils.Config{}, expected: imagePrompt},
+		{name: "Research prompt", prompt: "research", config: utils.Config{}, expected: researchPrompt},
 		{name: "Config prompt", prompt: "", config: utils.Config{AI: utils.AIConfig{Prompt: "Custom prompt from config"}}, expected: "Custom prompt from config"},
 		{name: "Custom prompt", prompt: "Custom prompt", config: utils.Config{}, expected: "Custom prompt"},
 	}

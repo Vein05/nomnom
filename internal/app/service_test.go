@@ -23,7 +23,7 @@ func TestPrepareRunAndClose(t *testing.T) {
   "case": "snake",
   "ai": {
     "provider": "deepseek",
-    "api_key": "dummy-key"
+    "api_key": "test-key"
   }
 }`), 0o644); err != nil {
 		t.Fatalf("WriteFile(config) error = %v", err)
@@ -49,9 +49,6 @@ func TestPrepareRunAndClose(t *testing.T) {
 
 	if err := service.GeneratePlan(run); err != nil {
 		t.Fatalf("GeneratePlan() error = %v", err)
-	}
-	if len(run.Query.Plan) != 0 {
-		t.Fatalf("GeneratePlan() plan len = %d, want 0 when using dummy key", len(run.Query.Plan))
 	}
 
 	if err := run.Close(); err != nil {

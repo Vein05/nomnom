@@ -54,10 +54,6 @@ func HandleAI(config utils.Config, query content.Query) (content.Query, error) {
 		return content.Query{}, fmt.Errorf("no API key found for provider %s", provider)
 	}
 
-	if config.AI.APIKey == "dummy-key" {
-		return query, nil
-	}
-
 	switch provider {
 	case "deepseek":
 		return SendQueryWithDeepSeek(config, query)

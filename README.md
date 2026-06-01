@@ -145,3 +145,7 @@ make desktop
 - `data/` - sample fixtures and reference material
 
 The desktop app uses the same Go service layer as the CLI. File scanning, AI planning, rename execution, logging, and analytics all run through shared backend code.
+
+## AI Disclosure
+
+NomNom was designed and built by humans. Claude Opus was used for code review and auditing during development.

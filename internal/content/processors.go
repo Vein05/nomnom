@@ -12,6 +12,7 @@ import (
 	"sync"
 	"syscall"
 
+	prompts "nomnom/data/prompts"
 	utils "nomnom/internal/utils"
 
 	"slices"
@@ -84,12 +85,6 @@ type FileTypeCategory struct {
 	Extensions []string
 }
 
-type Prompts struct {
-	Name     string
-	Path     string
-	TestPath string
-}
-
 var defaultCategories = []FileTypeCategory{
 	{Name: "Images", Extensions: []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}},
 	{Name: "Documents", Extensions: []string{".pdf", ".doc", ".docx", ".txt", ".md", ".rtf"}},
@@ -98,9 +93,10 @@ var defaultCategories = []FileTypeCategory{
 	{Name: "Others", Extensions: []string{}},
 }
 
-var NomNomPrompts = []Prompts{
-	{Name: "research", Path: "data/prompts/research.txt", TestPath: "../../data/prompts/research.txt"},
-	{Name: "images", Path: "data/prompts/images.txt", TestPath: "../../data/prompts/images.txt"},
+// embeddedPrompts maps prompt names to their compile-time embedded content.
+var embeddedPrompts = map[string]string{
+	"research": prompts.ResearchPrompt,
+	"images":   prompts.ImagesPrompt,
 }
 
 func NewQuery(params QueryParams) *Query {
@@ -282,9 +278,6 @@ func (p *SafeProcessor) processEntry(entry RenamePlanEntry, approvals map[string
 				result.Success = false
 				result.Error = fmt.Errorf("rename not approved")
 				return result, result.Error
-			}
-			if decision == utils.ApprovalAll {
-				p.query.AutoApprove = true
 			}
 		}
 
@@ -525,26 +518,10 @@ func ResolvePrompt(prompt string, config utils.Config) (string, error) {
 		return defaultPrompt, nil
 	}
 
-	switch strings.ToLower(trimmedPrompt) {
-	case "research":
-		return readPromptFile(NomNomPrompts[0], defaultPrompt)
-	case "images":
-		return readPromptFile(NomNomPrompts[1], defaultPrompt)
-	default:
-		return trimmedPrompt, nil
-	}
-}
-
-func readPromptFile(promptFile Prompts, fallback string) (string, error) {
-	content, err := os.ReadFile(promptFile.Path)
-	if err == nil {
-		return string(content), nil
+	key := strings.ToLower(trimmedPrompt)
+	if content, ok := embeddedPrompts[key]; ok {
+		return content, nil
 	}
 
-	content, testErr := os.ReadFile(promptFile.TestPath)
-	if testErr == nil {
-		return string(content), nil
-	}
-
-	return fallback, fmt.Errorf("failed to read prompt %q from both paths: %w", promptFile.Name, err)
+	return trimmedPrompt, nil
 }

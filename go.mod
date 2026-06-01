@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/cohesion-org/deepseek-go v1.3.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
-	github.com/fatih/color v1.7.0
+	github.com/fatih/color v1.19.0
 	github.com/gen2brain/go-fitz v1.24.14
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/manifoldco/promptui v0.9.0
@@ -23,7 +23,7 @@ require (
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/jupiterrider/ffi v0.2.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
-	github.com/mattn/go-colorable v0.1.2 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect

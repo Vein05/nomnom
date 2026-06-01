@@ -1,6 +1,7 @@
 package content
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -267,6 +268,9 @@ func scanFileWithTimeout(rootDir, path string, maxSize int64, timeout time.Durat
 		return scanFile(rootDir, path, maxSize)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	type result struct {
 		file ScannedFile
 		err  error
@@ -281,7 +285,7 @@ func scanFileWithTimeout(rootDir, path string, maxSize int64, timeout time.Durat
 	select {
 	case res := <-resultCh:
 		return res.file, res.err
-	case <-time.After(timeout):
+	case <-ctx.Done():
 		return ScannedFile{}, fmt.Errorf("scan timed out after %s", timeout)
 	}
 }

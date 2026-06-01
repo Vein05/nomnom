@@ -597,6 +597,12 @@ func (a *App) OpenFile(path string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	// Resolve symlinks before validation to prevent symlink traversal attacks.
+	absPath, err = filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
+	}
+
 	a.mu.RLock()
 	allowed := false
 	for _, job := range a.jobs {

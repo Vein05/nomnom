@@ -34,7 +34,7 @@ func TestHandleAIProviderSelection(t *testing.T) {
 			config: utils.Config{
 				AI: utils.AIConfig{
 					Provider: "deepseek",
-					APIKey:   "dummy-key",
+					APIKey:   "test-key",
 				},
 			},
 			envSetup:      map[string]string{},
@@ -49,7 +49,7 @@ func TestHandleAIProviderSelection(t *testing.T) {
 				},
 			},
 			envSetup: map[string]string{
-				"DEEPSEEK_API_KEY": "dummy-key",
+				"DEEPSEEK_API_KEY": "test-key",
 			},
 			expectedModel: "deepseek",
 			expectedError: false,
@@ -59,12 +59,11 @@ func TestHandleAIProviderSelection(t *testing.T) {
 			config: utils.Config{
 				AI: utils.AIConfig{
 					Provider: "ollama",
-					APIKey:   "dummy-key",
 				},
 			},
 			envSetup:      map[string]string{},
 			expectedModel: "ollama",
-			expectedError: false,
+			expectedError: true,
 		},
 		{
 			name: "No config API key but OpenRouter env variable set",
@@ -74,25 +73,24 @@ func TestHandleAIProviderSelection(t *testing.T) {
 				},
 			},
 			envSetup: map[string]string{
-				"OPENROUTER_API_KEY": "dummy-key",
+				"OPENROUTER_API_KEY": "test-key",
 			},
 			expectedModel: "openrouter",
-			expectedError: false,
+			expectedError: true,
 		},
 		{
 			name: "Multiple env variables set - should use provider from config",
 			config: utils.Config{
 				AI: utils.AIConfig{
 					Provider: "ollama",
-					APIKey:   "dummy-key",
 				},
 			},
 			envSetup: map[string]string{
-				"DEEPSEEK_API_KEY":   "dummy-key",
-				"OPENROUTER_API_KEY": "dummy-key",
+				"DEEPSEEK_API_KEY":   "test-key",
+				"OPENROUTER_API_KEY": "test-key",
 			},
 			expectedModel: "ollama",
-			expectedError: false,
+			expectedError: true,
 		},
 		{
 			name: "No API keys available for Deepseek",
@@ -121,7 +119,7 @@ func TestHandleAIProviderSelection(t *testing.T) {
 			config: utils.Config{
 				AI: utils.AIConfig{
 					Provider: "invalid-provider",
-					APIKey:   "dummy-key",
+					APIKey:   "test-key",
 				},
 			},
 			envSetup:      map[string]string{},
@@ -132,7 +130,7 @@ func TestHandleAIProviderSelection(t *testing.T) {
 			name: "No provider set - should default to deepseek",
 			config: utils.Config{
 				AI: utils.AIConfig{
-					APIKey: "dummy-key",
+					APIKey: "test-key",
 				},
 			},
 			envSetup:      map[string]string{},
